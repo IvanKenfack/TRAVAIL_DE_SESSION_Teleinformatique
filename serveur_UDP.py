@@ -12,17 +12,14 @@ print("Le serveur est démarré sur le port {}".format(port))
 # Boucle infinie pour écouter les connexions
 while True:
     #socket_UDP.listen()                                              # Le serveur écoute sur le port 2212 et est en attente de connexion
-    print("Le serveur est écoute sur le port {}".format(port))      # Affichage visuel de l'état du serveur
-    connexion, adresse = socket_UDP.recvfrom(1024)
-    print("APPLICATION_CONSOLE est connecté au serveur")          # Affichage visuel de l'état du serveur
+    print("Le serveur est en écoute sur le port {}".format(port))      # Affichage visuel de l'état du serveur
+data, adresse = socket_UDP.recvfrom(1024)
+print("APPLICATION_CONSOLE est connecté au serveur")          # Affichage visuel de l'état du serveur
 
+#connexion.close()   # Fermeture de la connexion
 
-connexion.close()   # Fermeture de la connexion
-print("Fermeture de la connexion")            # Affichage visuel de l'état du serveur
+#print("Fermeture de la connexion")            # Affichage visuel de l'état du serveur
 socket_UDP.close()      # Fermeture du socket
 print("Fermeture du socket")                  # Affichage visuel de l'état du serveur
-
-
-
 
 

@@ -16,7 +16,6 @@ while True:
     connexion, adresse = socket_UDP.recvfrom(1024)
     print("APPLICATION_CONSOLE est connecté au serveur")          # Affichage visuel de l'état du serveur
 
-
 connexion.close()   # Fermeture de la connexion
 print("Fermeture de la connexion")            # Affichage visuel de l'état du serveur
 socket_UDP.close()      # Fermeture du socket

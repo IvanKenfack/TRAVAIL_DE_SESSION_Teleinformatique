@@ -10,9 +10,41 @@ sock_servr = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)        # Création
 sock_servr.bind((hote, port))
 print("Le serveur est démarré sur le port {}".format(port))
 
+def ProcessusPoigneDeMain(socket):
+    print("***************** Processus de poignée de main coté serveur **********************")
+    print()
+    print("***************** Reception du SYN **********************")
+    print()
+    data, adresse = socket.recvfrom(1024)   # Reception du SYN
+    if data == b"SYN":
+        print("SYN reçu")
+    else:
+        print("SYN non reçu")
+    print()
+    print("***************** Envoi du SYN-ACK **********************")
+    print()
+    socket.sendto(b"SYN-ACK",address_client)    # Envoi du SYN-ACK
+    print()
+    print("***************** Reception de l'ACK **********************")
+    print()
+    data, adresse = socket.recvfrom(1024)   # Reception du ACK
+    if data == b"ACK":
+        print("ACK reçu")
+        print()
+        print("***************** Fin du processus de poignée de main **********************")
+        print()
+    else:
+        print("ACK non reçu")
+        print("Echec du processus de poignée de main")
+ 
+
+
+
 # Boucle infinie pour recevoir les messages des clients
 message_confirmation = b"Message bien recu"
 
+
+ProcessusPoigneDeMain(sock_servr)        # Appel de la fonction ProcessusPoigneDeMain
 while True:
     print("*"*40)
     print("Le serveur est en écoute sur le port {}".format(port))      # Affichage visuel de l'état du serveur

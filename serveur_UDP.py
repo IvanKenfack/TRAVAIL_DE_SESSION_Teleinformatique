@@ -1,5 +1,25 @@
 
 import socket
+import struct
+
+#Definition de la structure de l'entête
+format_entete = "!I I 3s I I 40s 15s 204800s"     # numero_seq(4 octets), numero_ack(4 octets), drapeau(3 octets), mss(4 octets), checksum(40 octets), nom_fichier(15 octets), morceau_fichier(204800 octets)
+
+#Parametres de l'entête
+numero_seq = 0
+numero_ack = 0
+drapeau = b""
+fenetrage = 0
+mss = 0
+checksum = b""
+nom_fichier = b""
+morceau_fichier = b""
+
+#Creation du segment
+#segment = struct.pack(format_entete, numero_seq, numero_ack, drapeau, mss, checksum, nom_fichier, morceau_fichier)
+
+
+
 
 
 # Fonction pour le processus de poignée de main
@@ -8,21 +28,25 @@ def ProcessusPoigneDeMain(socket):
     print()
     print("***************** Reception du SYN **********************")
     print()
-    data, adresse = socket.recvfrom(1024)   # Reception du SYN
-    if data == b"SYN":
+    donnée, adresse = socket.recvfrom(1024)   # Reception du SYN
+
+    if donnée == b"SYN":
         print("SYN reçu")
+
     else:
         print("SYN non reçu")
+
     print()
     print("***************** Envoi du SYN-ACK **********************")
     print()
     socket.sendto(b"SYN-ACK",address_client)    # Envoi du SYN-ACK
+    print("SYN-ACK envoyé")
     print()
     print("***************** Reception de l'ACK **********************")
     print()
-    data, adresse = socket.recvfrom(1024)   # Reception du ACK
+    donnée, adresse = socket.recvfrom(1024)   # Reception du ACK
 
-    if data == b"ACK":
+    if donnée == b"ACK":
         print("ACK reçu")
         print()
         print("***************** Fin du processus de poignée de main **********************")
@@ -53,41 +77,39 @@ address_client = ('localhost', 2213)     # address client
 sock_servr = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)        # Création du socket de type SOCK_DGRAM pour UDP
 sock_servr.bind((hote, port))        # Liaison du socket à une adresse IP et un port
 
-
-message_confirmation = b"Message bien recu"
+ 
+print()
+print("Le serveur est en écoute sur le port {}".format(port))      # Affichage visuel de l'état du serveur
+print()
+print("En attente d'une demande de connection")
+print()
 
 # Boucle infinie pour recevoir les messages des clients
 while True:
-    data, adresse = sock_servr.recvfrom(1024)   # Reception demande de connection
-    data = data.decode('utf-8')
-
-    if not data:
-        print()
-        print("Le serveur est en écoute sur le port {}".format(port))      # Affichage visuel de l'état du serveur
-        print()
-        print("En attente d'une demande de connection")
-        print()
-    elif data == "open localhost" or data == "open 127.0.0.1":
+    donnée, adresse = sock_servr.recvfrom(1024)   # Reception demande de connection
+    donnée = donnée.decode('utf-8')
+   
+    if donnée == "open localhost" or donnée == "open 127.0.0.1":
         print("Demande de connection reçue de la part de {}".format(adresse))
         print()
         ProcessusPoigneDeMain(sock_servr)        # Appel de la fonction ProcessusPoigneDeMain
         print()
         print()
         #print("*"*40)
-    elif data == "ls":
+    elif donnée == "ls":
         print()
-        #data, adresse = sock_servr.recvfrom(1024)                           # Réception des données
-        #print("Message reçu : {} de la part de {}".format(data, adresse))     # Affichage visuel des données reçues
+        #donnée, adresse = sock_servr.recvfrom(1024)                           # Réception des données
+        #print("Message reçu : {} de la part de {}".format(donnée, adresse))     # Affichage visuel des données reçues
         #sock_servr.sendto(message_confirmation,address_client)                      # Réponse au client
         print("Execution de la commande <ls>")                    # Affichage visuel de l'état du serveur
         print()
 
-    elif data == "get":
+    elif donnée == "get":
         print()
         print("Execution de la commande <get>")                    # Affichage visuel de l'état du serveur
         print()
     
-    elif data == "bye":
+    elif donnée == "bye":
         print()
         sock_servr.close()                               # Fermeture du socket
         #print("socket")                  # Affichage visuel de l'état du serveur

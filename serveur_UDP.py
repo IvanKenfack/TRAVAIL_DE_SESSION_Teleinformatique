@@ -1,62 +1,165 @@
 
 import socket
 import struct
+from hashlib import sha1
+import random
 
-#Definition de la structure de l'entête
-format_entete = "!I I 3s I I 40s 15s 204800s"     # numero_seq(4 octets), numero_ack(4 octets), drapeau(3 octets), mss(4 octets), checksum(40 octets), nom_fichier(15 octets), morceau_fichier(204800 octets)
+
+
+# Création du socket serveur
+
+# Definition des parametres de connexion
+hote, port = ('localhost', 2212)     
+address_client = ('localhost', 2213)
+
+# Création du socket de type SOCK_DGRAM
+sock_servr = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+# Liaison du socket à une adresse IP et un port        
+sock_servr.bind((hote, port)) 
+
+
 
 #Parametres de l'entête
+
+#Numero de sequence
 numero_seq = 0
+#Numero d'acquittement
 numero_ack = 0
+#Drapeau/code de controle
 drapeau = b""
-fenetrage = 0
-mss = 0
+
+#tailleMorçeau generé aléatoirement pour simuler également la mutabilité de ce dernier dependament de la connexion
+tailleMorçeau =random.randint(274,280)     #204874 
+
+#Taille de la fenetre generé aléatoirement pour simuler la mutabilité de ce dernier dependament de la connexion
+# limité entre le tailleMorçeau et tailleMorçeau*2 pour éviter de gérer le windows scaling le serveur ne recois pas grand chose du client
+fenetrage = random.randint(274,548)
+
 checksum = b""
 nom_fichier = b""
-morceau_fichier = b""
-
-#Creation du segment
-#segment = struct.pack(format_entete, numero_seq, numero_ack, drapeau, mss, checksum, nom_fichier, morceau_fichier)
+donnee = b""
 
 
+#Fonction du generateur de signature hash
+def GenerateurSignatureHash(donnee):
+
+    #initialisation de l'objet sha1
+    objet_sha1 = sha1()
+
+    #mise a jour de l'objet sha1 avec les donnees
+    objet_sha1.update(donnee)
+
+    #generation de la signature
+    signature = objet_sha1.digest()
+
+    #retourne la signature
+    return signature
+
+
+#Calcul et assignation des signatures de quelques parametres
+signature_SYN = GenerateurSignatureHash(b"SYN")
+signature_ACK = GenerateurSignatureHash(b"ACK")
+signature_SYN_ACK = GenerateurSignatureHash(b"SYN-ACK")
 
 
 
-# Fonction pour le processus de poignée de main
-def ProcessusPoigneDeMain(socket):
+#Definition parametre format de struct.pack
+# numero_seq(4 octets), numero_ack(4 octets), drapeau(3 octets), tailleMorçeau(4 octets), checksum(40 octets), nom_fichier(15 octets), donnee(204800 octets)
+format_entete = "!I I 3s I I 40s 15s 200s"     
+
+#Definition de la fonction de creation de segment
+def CreationSegment(numero_seq, numero_ack, drapeau, fenetrage, tailleMorçeau, checksum, nom_fichier, donnee):
+
+    #Empaquetage des parametres du segment
+    segment = struct.pack(format_entete, numero_seq, numero_ack, drapeau, fenetrage, tailleMorçeau, checksum, nom_fichier, donnee)
+    return segment
+
+
+#Definition de la fonction d'envoi de message avec gestion d'erreur
+def EnvoiMessage(socket, message, adresse):
+
+    try:
+        socket.sendto(message, adresse)    # Envoi du message
+        #print("Message envoyé")    # Affichage visuel de l'état du serveur
+
+    except OSError:
+        print("Taille du message trop grande")
+
+    except:
+        print(f"Erreur inconnue lors de l'envoi du message")    # Affichage visuel de l'erreur
+
+
+# Fonction pour l'initiation de la connexion (processus de Three-way handshake)
+def ProcessusInitiationConnexion(socket):
+
+    #Pour le passage par reference
+    global tailleMorçeau,fenetrage
+    print()
     print("***************** Processus de poignée de main coté serveur **********************")
+    print() 
     print()
-    print("***************** Reception du SYN **********************")
-    print()
-    donnée, adresse = socket.recvfrom(1024)   # Reception du SYN
+    # Reception du segment SYN
+    donnée, adresse = socket.recvfrom(1024)
+    
+    # Extraction des informations du segment
+    numero_seq, numero_ack, drapeau, fenetrage1, mss1, checksum, nom_fichier, donnee = struct.unpack(format_entete, donnée)
 
-    if donnée == b"SYN":
+    #Nettoyage des donnees
+    donnee = donnee.rstrip(b"\x00")
+
+    #Si l'intégrité des données est correct, le SYN_ACK est envoyé
+    if GenerateurSignatureHash(donnee) == checksum.rstrip(b"\x00"):
         print("SYN reçu")
+        print()
+        print("Numero de sequence : {}".format(numero_seq))
+        print("Numero d'acquittement : {}".format(numero_ack))
+        print("Drapeau : {}".format(drapeau))
+        print("Fenetrage : {}".format(fenetrage1))
+        print("Taille morçeau : {}".format(mss1))     
+        print()
 
+        #Creation et envoi du segment SYN-ACK / Negociation des parametres
+        segment = CreationSegment(0, 1, b"ACK", fenetrage, tailleMorçeau, signature_SYN_ACK, b"", b"SYN-ACK")
+        EnvoiMessage(socket, segment, address_client)    # Envoi du SYN-ACK
+        print("SYN-ACK envoyé")
+        print()
+
+    #Sinon il y'a affichage d'un message d'erreur
     else:
         print("SYN non reçu")
-
-    print()
-    print("***************** Envoi du SYN-ACK **********************")
-    print()
-    socket.sendto(b"SYN-ACK",address_client)    # Envoi du SYN-ACK
-    print("SYN-ACK envoyé")
-    print()
-    print("***************** Reception de l'ACK **********************")
-    print()
+        print("Echec du processus de poignée de main")
+        print()
+    
+    # Reception du ACK
     donnée, adresse = socket.recvfrom(1024)   # Reception du ACK
 
-    if donnée == b"ACK":
+     # Extraction des informations du segment
+    numero_seq, numero_ack, drapeau, fenetrage, tailleMorçeau, checksum, nom_fichier, donnee = struct.unpack(format_entete, donnée)
+
+    #Nettoyage des donnees
+    donnee = donnee.rstrip(b"\x00")
+
+    #Verification de l'integrité du segment et affichage de l'état du client
+    if GenerateurSignatureHash(donnee) == checksum.rstrip(b"\x00"):
         print("ACK reçu")
         print()
-        print("***************** Fin du processus de poignée de main **********************")
+        print("Numero de sequence : {}".format(numero_seq))
+        print("Numero d'acquittement : {}".format(numero_ack))
+        print("Drapeau : {}".format(drapeau))
+        print("Fenetrage : {}".format(fenetrage))
+        print("Taille morçeau : {}".format(tailleMorçeau)) 
         print()
-        print("Connexion établie avec {}".format(adresse))
+        sock_servr.connect(address_client)
+        print("Connexion établie avec success a {}".format(adresse))
+        print()
     else:
         print("ACK non reçu")
         print("Echec du processus de poignée de main")
- 
+        print()
+    
 
+    
 # Fonction pour l'envoi de fichier
 def EnvoiFichier(socket, adresse, nom_fichier):
     print("***************** Envoi du fichier **********************")
@@ -68,14 +171,6 @@ def EnvoiFichier(socket, adresse, nom_fichier):
             morçeau = fichier.read(1024)        # Lecture des octets pour controler la boucle
     print("Fichier envoyé")        # Affichage visuel de l'état du serveur
     print()
-
-
-# Création du socket UDP
-hote, port = ('localhost', 2212)     # address serveur
-address_client = ('localhost', 2213)     # address client
-
-sock_servr = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)        # Création du socket de type SOCK_DGRAM pour UDP
-sock_servr.bind((hote, port))        # Liaison du socket à une adresse IP et un port
 
  
 print()
@@ -92,7 +187,7 @@ while True:
     if donnée == "open localhost" or donnée == "open 127.0.0.1":
         print("Demande de connection reçue de la part de {}".format(adresse))
         print()
-        ProcessusPoigneDeMain(sock_servr)        # Appel de la fonction ProcessusPoigneDeMain
+        ProcessusInitiationConnexion(sock_servr)        # Appel de la fonction ProcessusInitiationConnexion
         print()
         print()
         #print("*"*40)

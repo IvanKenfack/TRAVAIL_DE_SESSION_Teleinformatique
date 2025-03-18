@@ -30,8 +30,12 @@ numero_ack = 0
 drapeau = b""
 #Taille maximal du segment/Maximum segment size
 tailleMorçeau = random.randint(274,280)
-#Taille de la fenetre
+#Taille de la fenetre du client
 fenetrage = random.randint(65486,65536)     #tailleMorçeau * 239  #65486
+
+#fenetrage serveur
+fenetrage_srvr = 0
+
 checksum = b""
 nom_fichier = b""
 donnee = b""
@@ -39,7 +43,7 @@ donnee = b""
 
 #Definition du parametre format de struct.pack
 # network byte order numero_seq(4 octets), numero_ack(4 octets), drapeau(3 octets), tailleMorçeau(4 octets), checksum(40 octets), nom_fichier(15 octets), donnee({tailleMorceau} octets)
-format_entete = f"!I I 3s I I 40s 15s {tailleMorçeau}s"     
+format_entete = f"!I I 3s I I 40s 15s 200s"     
 
 #Definition de la fonction de creation de segment
 def CreationSegment(numero_seq, numero_ack, drapeau, fenetrage, tailleMorçeau, checksum, nom_fichier, donnee):
@@ -90,7 +94,7 @@ signature_SYN_ACK = GenerateurSignatureHash(b"SYN-ACK")
 def ProcessusPoigneDeMain(socket):
 
     #Pour le passage par reference
-    global tailleMorçeau,fenetrage
+    global tailleMorçeau,fenetrage_srvr,fenetrage
     
     print()
     print("********* Processus de poignée de main coté client **************")
@@ -113,6 +117,9 @@ def ProcessusPoigneDeMain(socket):
 
     #Nettoyage des donnees
     donnee = donnee.rstrip(b"\x00")
+    
+    #Modification fenetrage serveur
+    fenetrage_srvr = fenetrage1
 
     #Si l'intégrité des données est correct, le ACK est envoyé
     if GenerateurSignatureHash(donnee) == checksum.rstrip(b"\x00"):
@@ -121,13 +128,14 @@ def ProcessusPoigneDeMain(socket):
         print("Numero de sequence : {}".format(numero_seq))
         print("Numero d'acquittement : {}".format(numero_ack))
         print("Drapeau : {}".format(drapeau))
-        print("Fenetrage : {}".format(fenetrage1))
+        print("Fenetrage_serveur : {}".format(fenetrage1))
         print("MSS : {}".format(tailleMorçeau1)) 
         print()
 
         #Logique de négociation
-        if tailleMorçeau1 > tailleMorçeau:
-            tailleMorçeau = 
+        if tailleMorçeau1 < tailleMorçeau:
+            tailleMorçeau = tailleMorçeau1  
+
         #Creation et envoi du segment ACK / Finalisation  de la connexion
         segment = CreationSegment(1, 1, b"ACK", fenetrage, tailleMorçeau, signature_ACK, b"", b"ACK")
         EnvoiMessage(socket, segment, address_serveur)
@@ -144,8 +152,10 @@ def ProcessusPoigneDeMain(socket):
     sock_client1.connect(address_serveur) 
     print("Connexion établie avec success a {}".format(address_serveur))
     print()
-    print('''Parametres negocié: 
-          ''')
+    print(f'''*** Parametres negocié: ***
+            Taille_morceau : {tailleMorçeau} 
+            Fenetrage_client : {fenetrage}
+            Fenetrage_serveur : {fenetrage_srvr}''')
 
 # Boucle infinie pour l'envoi des commandes
 while True:

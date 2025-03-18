@@ -1,6 +1,7 @@
 
 import socket
 import struct
+import os
 from hashlib import sha1
 import random
 
@@ -34,7 +35,9 @@ tailleMorçeau =random.randint(274,280)     #204874
 
 #Taille de la fenetre generé aléatoirement pour simuler la mutabilité de ce dernier dependament de la connexion
 # limité entre le tailleMorçeau et tailleMorçeau*2 pour éviter de gérer le windows scaling le serveur ne recois pas grand chose du client
-fenetrage = random.randint(274,548)
+fenetrage_srvr = random.randint(274,548)
+#fentrage recu du client
+fenetrage_clt = 0
 
 checksum = b""
 nom_fichier = b""
@@ -69,10 +72,10 @@ signature_SYN_ACK = GenerateurSignatureHash(b"SYN-ACK")
 format_entete = "!I I 3s I I 40s 15s 200s"     
 
 #Definition de la fonction de creation de segment
-def CreationSegment(numero_seq, numero_ack, drapeau, fenetrage, tailleMorçeau, checksum, nom_fichier, donnee):
+def CreationSegment(numero_seq, numero_ack, drapeau, fenetrage_srvr, tailleMorçeau, checksum, nom_fichier, donnee):
 
     #Empaquetage des parametres du segment
-    segment = struct.pack(format_entete, numero_seq, numero_ack, drapeau, fenetrage, tailleMorçeau, checksum, nom_fichier, donnee)
+    segment = struct.pack(format_entete, numero_seq, numero_ack, drapeau, fenetrage_srvr, tailleMorçeau, checksum, nom_fichier, donnee)
     return segment
 
 
@@ -94,7 +97,7 @@ def EnvoiMessage(socket, message, adresse):
 def ProcessusInitiationConnexion(socket):
 
     #Pour le passage par reference
-    global tailleMorçeau,fenetrage
+    global fenetrage_clt,fenetrage_srvr,tailleMorçeau
     print()
     print("***************** Processus de poignée de main coté serveur **********************")
     print() 
@@ -107,6 +110,9 @@ def ProcessusInitiationConnexion(socket):
 
     #Nettoyage des donnees
     donnee = donnee.rstrip(b"\x00")
+    
+    #Modification du fenetrage client
+    fenetrage_clt = fenetrage1
 
     #Si l'intégrité des données est correct, le SYN_ACK est envoyé
     if GenerateurSignatureHash(donnee) == checksum.rstrip(b"\x00"):
@@ -115,12 +121,12 @@ def ProcessusInitiationConnexion(socket):
         print("Numero de sequence : {}".format(numero_seq))
         print("Numero d'acquittement : {}".format(numero_ack))
         print("Drapeau : {}".format(drapeau))
-        print("Fenetrage : {}".format(fenetrage1))
+        print("Fenetrage_client : {}".format(fenetrage1))
         print("Taille morçeau : {}".format(mss1))     
         print()
 
         #Creation et envoi du segment SYN-ACK / Negociation des parametres
-        segment = CreationSegment(0, 1, b"ACK", fenetrage, tailleMorçeau, signature_SYN_ACK, b"", b"SYN-ACK")
+        segment = CreationSegment(0, 1, b"ACK", fenetrage_srvr, tailleMorçeau, signature_SYN_ACK, b"", b"SYN-ACK")
         EnvoiMessage(socket, segment, address_client)    # Envoi du SYN-ACK
         print("SYN-ACK envoyé")
         print()
@@ -135,7 +141,7 @@ def ProcessusInitiationConnexion(socket):
     donnée, adresse = socket.recvfrom(1024)   # Reception du ACK
 
      # Extraction des informations du segment
-    numero_seq, numero_ack, drapeau, fenetrage, tailleMorçeau, checksum, nom_fichier, donnee = struct.unpack(format_entete, donnée)
+    numero_seq, numero_ack, drapeau, fenetrage1, tailleMorçeau, checksum, nom_fichier, donnee = struct.unpack(format_entete, donnée)
 
     #Nettoyage des donnees
     donnee = donnee.rstrip(b"\x00")
@@ -147,12 +153,18 @@ def ProcessusInitiationConnexion(socket):
         print("Numero de sequence : {}".format(numero_seq))
         print("Numero d'acquittement : {}".format(numero_ack))
         print("Drapeau : {}".format(drapeau))
-        print("Fenetrage : {}".format(fenetrage))
+        print("Fenetrage : {}".format(fenetrage1))
         print("Taille morçeau : {}".format(tailleMorçeau)) 
         print()
         sock_servr.connect(address_client)
         print("Connexion établie avec success a {}".format(adresse))
         print()
+        print(f'''*** Parametres negocié: ***
+            Taille_morceau : {tailleMorçeau} 
+            Fenetrage_client : {fenetrage_clt}
+            Fenetrage_serveur : {fenetrage_srvr}''')
+        print()
+
     else:
         print("ACK non reçu")
         print("Echec du processus de poignée de main")
@@ -181,35 +193,39 @@ print()
 
 # Boucle infinie pour recevoir les messages des clients
 while True:
-    donnée, adresse = sock_servr.recvfrom(1024)   # Reception demande de connection
-    donnée = donnée.decode('utf-8')
-   
-    if donnée == "open localhost" or donnée == "open 127.0.0.1":
+    commande, adresse = sock_servr.recvfrom(1024)   # Reception demande de connection
+    commande = commande.decode('utf-8')
+    
+    # si commande = open localhost ou 127.0.0.1
+    if commande == "open localhost" or commande == "open 127.0.0.1":
         print("Demande de connection reçue de la part de {}".format(adresse))
         print()
         ProcessusInitiationConnexion(sock_servr)        # Appel de la fonction ProcessusInitiationConnexion
         print()
         print()
         #print("*"*40)
-    elif donnée == "ls":
+        
+    # si commande = ls
+    elif commande == "ls":
         print()
-        #donnée, adresse = sock_servr.recvfrom(1024)                           # Réception des données
-        #print("Message reçu : {} de la part de {}".format(donnée, adresse))     # Affichage visuel des données reçues
-        #sock_servr.sendto(message_confirmation,address_client)                      # Réponse au client
         print("Execution de la commande <ls>")                    # Affichage visuel de l'état du serveur
         print()
-
-    elif donnée == "get":
+        
+    #si commande = get
+    elif commande == "get":
         print()
         print("Execution de la commande <get>")                    # Affichage visuel de l'état du serveur
         print()
-    
-    elif donnée == "bye":
+        
+    #Si commande = bye
+    elif commande == "bye":
         print()
         sock_servr.close()                               # Fermeture du socket
         #print("socket")                  # Affichage visuel de l'état du serveur
         print("Connexion au serveur terminé")            # Affichage visuel de l'état du serveur
         break
+    
+    #Erreur d'entrée
     else:
         print()
         print("Commande non reconnue")

@@ -159,10 +159,12 @@ def ProcessusInitiationConnexion(socket):
         sock_servr.connect(address_client)
         print("Connexion établie avec success a {}".format(adresse))
         print()
+        print()
         print(f'''*** Parametres negocié: ***
             Taille_morceau : {tailleMorçeau} 
             Fenetrage_client : {fenetrage_clt}
             Fenetrage_serveur : {fenetrage_srvr}''')
+        print()
         print()
 
     else:
@@ -174,6 +176,7 @@ def ProcessusInitiationConnexion(socket):
     
 # Fonction pour l'envoi de fichier
 def EnvoiFichier(socket, adresse, nom_fichier):
+    print()
     print("***************** Envoi du fichier **********************")
     print()
     with open(nom_fichier, "rb") as fichier:     # Ouverture du fichier en mode lecture binaire
@@ -196,8 +199,8 @@ while True:
     commande, adresse = sock_servr.recvfrom(1024)   # Reception demande de connection
     commande = commande.decode('utf-8')
     
-    # si commande = open localhost ou 127.0.0.1
-    if commande == "open localhost" or commande == "open 127.0.0.1":
+    # si commande = open localhost ou open 127.0.0.1
+    if commande == "open localhost" or commande == "open 127.0.0.1" or commande == "1":
         print("Demande de connection reçue de la part de {}".format(adresse))
         print()
         ProcessusInitiationConnexion(sock_servr)        # Appel de la fonction ProcessusInitiationConnexion
@@ -206,19 +209,33 @@ while True:
         #print("*"*40)
         
     # si commande = ls
-    elif commande == "ls":
+    elif commande == "ls" or commande == "2":
         print()
-        print("Execution de la commande <ls>")                    # Affichage visuel de l'état du serveur
+        print("Execution de la commande <ls>")
+        print()
+        print(os.listdir("Dossier_Travail"))
+
+        #Recuperation de la liste du contenu du repertoire cible
+        données = os.listdir("Dossier_Travail")
+        
+        #Conversion de la liste en chaine de caractere
+        données = "\n".join(données)
+
+        #Envoi de la liste des fichiers
+        sock_servr.send(données.encode('utf-8'))
+        print()
+        print("Liste des fichiers envoyée")
+        print()
         print()
         
     #si commande = get
-    elif commande == "get":
+    elif commande == "get" or commande == "3":
         print()
         print("Execution de la commande <get>")                    # Affichage visuel de l'état du serveur
         print()
         
     #Si commande = bye
-    elif commande == "bye":
+    elif commande == "bye" or commande == "4":
         print()
         sock_servr.close()                               # Fermeture du socket
         #print("socket")                  # Affichage visuel de l'état du serveur
@@ -230,6 +247,7 @@ while True:
         print()
         print("Commande non reconnue")
         print()
+        continue
 
 
 

@@ -141,6 +141,7 @@ def ProcessusPoigneDeMain(socket):
         EnvoiMessage(socket, segment, address_serveur)
         print("ACK envoyé")
         print()
+        print()
       
     #Sinon il y'a affichage d'un message d'erreur
     else:
@@ -152,10 +153,13 @@ def ProcessusPoigneDeMain(socket):
     sock_client1.connect(address_serveur) 
     print("Connexion établie avec success a {}".format(address_serveur))
     print()
-    print(f'''*** Parametres negocié: ***
+    print()
+    print(f'''        *** Parametres negocié: ***
             Taille_morceau : {tailleMorçeau} 
             Fenetrage_client : {fenetrage}
             Fenetrage_serveur : {fenetrage_srvr}''')
+    print()
+
 
 # Boucle infinie pour l'envoi des commandes
 while True:
@@ -176,29 +180,32 @@ while True:
     commande = input("Commande: ")
     print()
 
-    if commande == "bye":        # Condition pour arrêter la connexion
-        sock_client1.sendto(commande.encode(), address_serveur)    # Envoi de la commande
+    if commande == "bye" or commande == "4":
+         # Envoi de la commande
+        sock_client1.send(commande.encode())   
         sock_client1.close()    # Fermeture du socket
         print("Connexion fermée")    # Affichage visuel de la connexion fermée
         break
 
-    if commande == "ls":
-        sock_client1.sendto(commande.encode(), address_serveur)    # Envoi de la commande
-        #print(f"Commande envoyée : {commande}")    # Affichage visuel de la commande envoyée
+    if commande == "ls" or commande == "2":
+        sock_client1.send(commande.encode())
+        
+        # Reception des données
+        données = sock_client1.recv(1024).decode('utf-8')
         print()
-        #ProcessusPoigneDeMain(sock_client1)        # Appel de la fonction ProcessusPoigneDeMain
+        print("****** Liste des fichiers disponibles ******")
         print()
-        #données, adresse = sock_client1.recvfrom(1024)    # Réception de la réponse
-        #print(données)     # Affichage visuel de la réponse
+        print(données)
+        print()
         print()
 
-    elif commande == "open localhost" or commande == "open 127.0.0.1":
+    elif commande == "open localhost" or commande == "open 127.0.0.1" or commande == "1":
         sock_client1.sendto(commande.encode(), address_serveur)    # Envoi de la commande
         ProcessusPoigneDeMain(sock_client1)        # Appel de la fonction ProcessusPoigneDeMain
 
 
 
-    elif commande == "get":
+    elif commande == "get" or commande == "3":
         nom_fichier = input("Entrez le nom du fichier à télécharger: ")
         print() 
         sock_client1.sendto(commande.encode(), address_serveur)    # Envoi de la commande
@@ -206,4 +213,5 @@ while True:
     else:
         print("Commande inconnue")
         print()
+        continue
 

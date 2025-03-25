@@ -4,6 +4,7 @@ import struct
 import os
 from hashlib import sha1
 import random
+from tqdm import tqdm
 
 
 
@@ -31,7 +32,7 @@ numero_ack = 0
 drapeau = b""
 
 #tailleMorçeau generé aléatoirement pour simuler également la mutabilité de ce dernier dependament de la connexion
-tailleMorçeau =random.randint(274,280)     #204874 
+tailleMorçeau = 200 #random.randint(274,280)     #204874 
 
 #Taille de la fenetre generé aléatoirement pour simuler la mutabilité de ce dernier dependament de la connexion
 # limité entre le tailleMorçeau et tailleMorçeau*2 pour éviter de gérer le windows scaling le serveur ne recois pas grand chose du client
@@ -69,7 +70,7 @@ signature_SYN_ACK = GenerateurSignatureHash(b"SYN-ACK")
 
 #Definition parametre format de struct.pack
 # numero_seq(4 octets), numero_ack(4 octets), drapeau(3 octets), tailleMorçeau(4 octets), checksum(40 octets), nom_fichier(15 octets), donnee(204800 octets)
-format_entete = "!I I 3s I I 40s 15s 200s"     
+format_entete = "!I I 3s I I 40s 15s 950s"     
 
 #Definition de la fonction de creation de segment
 def CreationSegment(numero_seq, numero_ack, drapeau, fenetrage_srvr, tailleMorçeau, checksum, nom_fichier, donnee):
@@ -92,6 +93,7 @@ def EnvoiMessage(socket, message, adresse):
     except:
         print(f"Erreur inconnue lors de l'envoi du message")    # Affichage visuel de l'erreur
 
+############################################################################################################
 
 # Fonction pour l'initiation de la connexion (processus de Three-way handshake)
 def ProcessusInitiationConnexion(socket):
@@ -140,7 +142,7 @@ def ProcessusInitiationConnexion(socket):
     # Reception du ACK
     donnée, adresse = socket.recvfrom(1024)   # Reception du ACK
 
-     # Extraction des informations du segment
+     # Extraction des informations reçues
     numero_seq, numero_ack, drapeau, fenetrage1, tailleMorçeau, checksum, nom_fichier, donnee = struct.unpack(format_entete, donnée)
 
     #Nettoyage des donnees
@@ -173,20 +175,32 @@ def ProcessusInitiationConnexion(socket):
         print()
     
 
-    
+############################################################################################################
+
+
 # Fonction pour l'envoi de fichier
-def EnvoiFichier(socket, adresse, nom_fichier):
+def EnvoiFichier(socket, nom_fichier):
+    global fenetrage_clt,tailleMorçeau
     print()
     print("***************** Envoi du fichier **********************")
     print()
-    with open(nom_fichier, "rb") as fichier:     # Ouverture du fichier en mode lecture binaire
-        morçeau = fichier.read(1024)        # Lecture des octets
-        while morçeau:        # Boucle pour lire tous les octets
-            socket.sendto(morçeau, adresse)      # Envoi des octets
-            morçeau = fichier.read(1024)        # Lecture des octets pour controler la boucle
-    print("Fichier envoyé")        # Affichage visuel de l'état du serveur
+
+    # Envoi du fichier
+    with open (nom_fichier, "rb") as fichier:    # Ouverture du fichier en mode lecture binaire
+        morçeau = fichier.read(950)                # Lecture des octets
+        while morçeau:                             # Boucle pour lire tous les octets
+                segment =  CreationSegment(numero_seq, numero_ack, b"", fenetrage_srvr, tailleMorçeau, GenerateurSignatureHash(morçeau), b"", morçeau)
+                socket.send(segment)         # Envoi des octets
+                morçeau = fichier.read(950)        # Lecture des octets pour controler la boucle
+        
+        # Envoi du segment de fin
+        segment = CreationSegment(numero_seq, numero_ack, b"FIN", fenetrage_srvr, tailleMorçeau, GenerateurSignatureHash(b"FIN"), b"", b"")
+        socket.send(segment)         # Envoi du segment de fin
+        print("Fichier envoyé")                    
     print()
 
+
+############################################################################################################   
  
 print()
 print("Le serveur est en écoute sur le port {}".format(port))      # Affichage visuel de l'état du serveur
@@ -215,7 +229,7 @@ while True:
         print()
         print(os.listdir("Dossier_Travail"))
 
-        #Recuperation de la liste du contenu du repertoire cible
+        #Recuperation de la liste du contenu du repertoire de fichiers
         données = os.listdir("Dossier_Travail")
         
         #Conversion de la liste en chaine de caractere
@@ -233,7 +247,20 @@ while True:
         print()
         print("Execution de la commande <get>")                    # Affichage visuel de l'état du serveur
         print()
+
+        #Reception du nom du fichier demandé
+        nom_fichier = sock_servr.recv(1024)
         
+        #Decodage du nom du fichier
+        nom_fichier = nom_fichier.decode('utf-8')
+        print("Nom du fichier demandé: {}".format(nom_fichier))
+        print()
+        EnvoiFichier(sock_servr, nom_fichier)
+        #print(f"fenetrage_clt : {fenetrage_clt}")
+        #print()
+
+
+
     #Si commande = bye
     elif commande == "bye" or commande == "4":
         print()

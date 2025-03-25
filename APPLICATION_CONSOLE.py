@@ -3,6 +3,7 @@ import socket
 import struct
 from hashlib import sha1
 import random
+import os
 
 
 # Creation du socket client
@@ -29,9 +30,9 @@ numero_ack = 0
 #Drapeau/code de controle
 drapeau = b""
 #Taille maximal du segment/Maximum segment size
-tailleMorçeau = random.randint(274,280)
+tailleMorçeau = 200 #random.randint(274,280)
 #Taille de la fenetre du client
-fenetrage = random.randint(65486,65536)     #tailleMorçeau * 239  #65486
+fenetrage =  random.randint(65486,65536)     #tailleMorçeau * 239  #65486
 
 #fenetrage serveur
 fenetrage_srvr = 0
@@ -43,15 +44,16 @@ donnee = b""
 
 #Definition du parametre format de struct.pack
 # network byte order numero_seq(4 octets), numero_ack(4 octets), drapeau(3 octets), tailleMorçeau(4 octets), checksum(40 octets), nom_fichier(15 octets), donnee({tailleMorceau} octets)
-format_entete = f"!I I 3s I I 40s 15s 200s"     
+format_entete = f"!I I 3s I I 40s 15s 950s"     
 
 #Definition de la fonction de creation de segment
 def CreationSegment(numero_seq, numero_ack, drapeau, fenetrage, tailleMorçeau, checksum, nom_fichier, donnee):
 
-    #Empaquetage des parametres du segment
+    #Empaquetage des donnèes du segment
     segment = struct.pack(format_entete, numero_seq, numero_ack, drapeau, fenetrage, tailleMorçeau, checksum, nom_fichier, donnee)
     return segment
 
+######################################################################################
 
 #Definition de la fonction d'envoi de message avec gestion d'erreur
 def EnvoiMessage(socket, message, adresse):
@@ -66,7 +68,7 @@ def EnvoiMessage(socket, message, adresse):
     except:
         print(f"Erreur inconnue lors de l'envoi du message")    # Affichage visuel de l'erreur
 
-
+######################################################################################
 
 #Definition du generateur du checksum/hash avec la fonction de hachage sha1
 def GenerateurSignatureHash(donnee):
@@ -88,6 +90,9 @@ def GenerateurSignatureHash(donnee):
 signature_SYN = GenerateurSignatureHash(b"SYN")
 signature_ACK = GenerateurSignatureHash(b"ACK")
 signature_SYN_ACK = GenerateurSignatureHash(b"SYN-ACK")
+
+
+######################################################################################
 
 
 # Fonction pour l'initiation de la connexion (processus de Three-way handshake)
@@ -129,7 +134,7 @@ def ProcessusPoigneDeMain(socket):
         print("Numero d'acquittement : {}".format(numero_ack))
         print("Drapeau : {}".format(drapeau))
         print("Fenetrage_serveur : {}".format(fenetrage1))
-        print("MSS : {}".format(tailleMorçeau1)) 
+        print("MSS : {}".format(tailleMorçeau1+74)) 
         print()
 
         #Logique de négociation
@@ -161,6 +166,37 @@ def ProcessusPoigneDeMain(socket):
     print()
 
 
+######################################################################################
+
+
+#Fonction pour la reception des données
+def ReceptionDonnees(socket,nom_fichier_reçu):
+
+    global format_entete
+
+    print()
+    print ("Reception des données")
+    print()
+
+    with open (nom_fichier_reçu, "wb") as fichier_reçu:
+        while True:
+            données = socket.recv(1024)
+            numero_seq, numero_ack, drapeau, fenetrage1, mss1, checksum, nom_fichier, donnees = struct.unpack(format_entete, données)
+            donnée = donnees.rstrip(b"\x00")
+            drapeau = drapeau.decode()
+
+            #Verificatio de la fin du fichier
+            if drapeau == "FIN":
+                print("FIN du fichier reçu")
+                break
+            fichier_reçu.write(donnée)
+    print()
+    print("Fichier reçu avec success")
+
+
+
+
+
 # Boucle infinie pour l'envoi des commandes
 while True:
     print()
@@ -180,13 +216,16 @@ while True:
     commande = input("Commande: ")
     print()
 
+    # Si la commande est "bye" ou "4", on ferme la connexion
     if commande == "bye" or commande == "4":
+
          # Envoi de la commande
         sock_client1.send(commande.encode())   
         sock_client1.close()    # Fermeture du socket
         print("Connexion fermée")    # Affichage visuel de la connexion fermée
         break
 
+    # Si la commande est "ls" ou "2", on affiche la liste des fichiers disponibles
     if commande == "ls" or commande == "2":
         sock_client1.send(commande.encode())
         
@@ -199,6 +238,7 @@ while True:
         print()
         print()
 
+    # Si la commande est "open localhost" ou "open
     elif commande == "open localhost" or commande == "open 127.0.0.1" or commande == "1":
         sock_client1.sendto(commande.encode(), address_serveur)    # Envoi de la commande
         ProcessusPoigneDeMain(sock_client1)        # Appel de la fonction ProcessusPoigneDeMain
@@ -208,7 +248,22 @@ while True:
     elif commande == "get" or commande == "3":
         nom_fichier = input("Entrez le nom du fichier à télécharger: ")
         print() 
-        sock_client1.sendto(commande.encode(), address_serveur)    # Envoi de la commande
+        sock_client1.send(commande.encode())    # Envoi de la commande
+
+        # Envoi du nom du fichier à télécharger
+        sock_client1.send(nom_fichier.encode())
+        print()
+        print("Nom du fichier envoyé")
+
+        # Je modifie le nom du fichier à la reception pour eviter les conflits d'ecriture
+        nom, extension = os.path.splitext(nom_fichier)
+        fichier_reçu = f"{nom}_reçu{extension}"
+        print()
+        ReceptionDonnees(sock_client1,fichier_reçu)
+        print()
+
+        # Reception des données
+
 
     else:
         print("Commande inconnue")

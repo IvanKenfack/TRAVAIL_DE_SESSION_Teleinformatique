@@ -215,3 +215,22 @@ while True:
         print()
         continue
 
+# Réception du fichier
+with open("recu_" + nom_fichier, "wb") as file:
+    while True:
+        try:
+            packet, server_address = sock_client1.recvfrom(1024)
+            seq_num, received_checksum, chunk = struct.unpack(f"!I 20s {1024}s", packet)
+            
+            # Vérification de l'intégrité des données
+            if sha1(chunk).digest() != received_checksum:
+                print("Erreur d'intégrité des données, demande de renvoi...")
+                continue
+            
+            file.write(chunk)
+            sock_client1.sendto(str(seq_num).encode(), address_serveur)
+        except socket.timeout:
+            break
+
+print("Fichier reçu avec succès.")
+

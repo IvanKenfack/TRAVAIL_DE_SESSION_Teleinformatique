@@ -251,6 +251,29 @@ while True:
 
 
 
+ # Lecture du fichier en mode binaire
+    with open(nom_fichier, "rb") as file:
+        seq_num = 0
+        while chunk := file.read(1024):
+            checksum = sha1(chunk).digest()
+            packet = struct.pack(f"!I 20s {len(chunk)}s", seq_num, checksum, chunk)
+            sock_servr.sendto(packet, address_client)
+            
+            # Attente de l'ACK
+            try:
+                ack, _ = sock_servr.recvfrom(10)
+                ack_num = int(ack.decode())
+                if ack_num != seq_num:
+                    print("Erreur de synchronisation, renvoi du paquet")
+                    continue
+            except socket.timeout:
+                print("ACK non reçu, renvoi du paquet")
+                continue
+            
+            seq_num += 1
+    
+    print("Transfert terminé")
+
 
 
 

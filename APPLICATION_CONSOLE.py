@@ -23,6 +23,8 @@ sock_client1.bind((hote, port))
 
 #Parametres de l'entête du segment
 
+#Commande
+commande = b""
 #Numero de sequence
 numero_seq = 0   
 #Numero d'acquittement
@@ -30,7 +32,7 @@ numero_ack = 0
 #Drapeau/code de controle
 drapeau = b""
 #Taille maximal du segment/Maximum segment size
-tailleMorçeau = 200 #random.randint(274,280)
+tailleMorçeau = 745 #random.randint(274,280)
 #Taille de la fenetre du client
 fenetrage =  random.randint(65486,65536)     #tailleMorçeau * 239  #65486
 
@@ -44,7 +46,7 @@ donnee = b""
 
 #Definition du parametre format de struct.pack
 # network byte order numero_seq(4 octets), numero_ack(4 octets), drapeau(3 octets), tailleMorçeau(4 octets), checksum(40 octets), nom_fichier(15 octets), donnee({tailleMorceau} octets)
-format_entete = f"!I I 3s I I 40s 15s 950s"     
+format_entete = f"!5s I I 3s I I 40s 15s 950s"     
 
 #Definition de la fonction de creation de segment
 def CreationSegment(numero_seq, numero_ack, drapeau, fenetrage, tailleMorçeau, checksum, nom_fichier, donnee):
@@ -60,7 +62,7 @@ def EnvoiMessage(socket, message, adresse):
 
     try:
         socket.sendto(message, adresse)    # Envoi du message
-        #print("Message envoyé")    # Affichage visuel de l'état du serveur
+
 
     except OSError:
         print("Taille du message trop grande")
@@ -69,6 +71,7 @@ def EnvoiMessage(socket, message, adresse):
         print(f"Erreur inconnue lors de l'envoi du message")    # Affichage visuel de l'erreur
 
 ######################################################################################
+
 
 #Definition du generateur du checksum/hash avec la fonction de hachage sha1
 def GenerateurSignatureHash(donnee):
@@ -253,9 +256,9 @@ while True:
         # Envoi du nom du fichier à télécharger
         sock_client1.send(nom_fichier.encode())
         print()
-        print("Nom du fichier envoyé")
+        print("Nom du fichier voulu envoyé")
 
-        # Je modifie le nom du fichier à la reception pour eviter les conflits d'ecriture
+        # Je modifie le nom du fichier à la reception pour eviter les conflits d'ecriture (le fichier source étant dans le meme repertoire)
         nom, extension = os.path.splitext(nom_fichier)
         fichier_reçu = f"{nom}_reçu{extension}"
         print()

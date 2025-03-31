@@ -24,6 +24,8 @@ sock_servr.bind((hote, port))
 
 #Parametres de l'entête
 
+#Commande
+commande = b""
 #Numero de sequence
 numero_seq = 0
 #Numero d'acquittement
@@ -35,7 +37,7 @@ drapeau = b""
 tailleMorçeau = 200 #random.randint(274,280)     #204874 
 
 #Taille de la fenetre generé aléatoirement pour simuler la mutabilité de ce dernier dependament de la connexion
-# limité entre le tailleMorçeau et tailleMorçeau*2 pour éviter de gérer le windows scaling le serveur ne recois pas grand chose du client
+# limité entre la tailleMorçeau et tailleMorçeau*2 pour éviter de gérer le windows scaling le serveur ne recois pas grand chose du client
 fenetrage_srvr = random.randint(274,548)
 #fentrage recu du client
 fenetrage_clt = 0
@@ -202,6 +204,8 @@ def EnvoiFichier(socket, nom_fichier):
 
 ############################################################################################################   
  
+
+# Affichage visuel de l'état initial du serveur
 print()
 print("Le serveur est en écoute sur le port {}".format(port))      # Affichage visuel de l'état du serveur
 print()
@@ -212,7 +216,7 @@ print()
 while True:
     commande, adresse = sock_servr.recvfrom(1024)   # Reception demande de connection
     commande = commande.decode('utf-8')
-    
+
     # si commande = open localhost ou open 127.0.0.1
     if commande == "open localhost" or commande == "open 127.0.0.1" or commande == "1":
         print("Demande de connection reçue de la part de {}".format(adresse))
@@ -275,7 +279,6 @@ while True:
         print("Commande non reconnue")
         print()
         continue
-
 
 
 

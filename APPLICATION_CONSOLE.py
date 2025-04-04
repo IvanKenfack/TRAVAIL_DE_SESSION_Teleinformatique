@@ -20,6 +20,19 @@ address_serveur = ('localhost', 2212)
 # Liaison du socket à une adresse IP et un port
 sock_client1.bind((hote, port))
 
+#####################################################
+               #CONFIGURATIONS
+
+#Nombre d'essais d'envoi de segment
+ESSAIES_MAX = 5
+
+#Delai d'attente maximal avant de renvoyer le segment
+DELAI_MAX = 3
+
+#Fiabilité du reseau
+FIABILITE = round(random.choice([0.95, 1.0]),2)   #remplacer par 1.0 pour simuler un reseau fiable
+print(f"Fiabilité du reseau: {FIABILITE}")
+print()
 
 #Parametres de l'entête du segment
 
@@ -48,29 +61,65 @@ donnee = b""
 # network byte order numero_seq(4 octets), numero_ack(4 octets), drapeau(3 octets), tailleMorçeau(4 octets), checksum(40 octets), nom_fichier(15 octets), donnee({tailleMorceau} octets)
 format_entete = f"!5s I I 3s I I 40s 15s 950s"     
 
+
+########################################################################################
+
+
 #Definition de la fonction de creation de segment
-def CreationSegment(numero_seq, numero_ack, drapeau, fenetrage, tailleMorçeau, checksum, nom_fichier, donnee):
+def CreationSegment(commande,numero_seq, numero_ack, drapeau, fenetrage, tailleMorçeau, checksum, nom_fichier, donnee):
 
     #Empaquetage des donnèes du segment
-    segment = struct.pack(format_entete, numero_seq, numero_ack, drapeau, fenetrage, tailleMorçeau, checksum, nom_fichier, donnee)
+    segment = struct.pack(format_entete, commande, numero_seq, numero_ack, drapeau, fenetrage, tailleMorçeau, checksum, nom_fichier, donnee)
     return segment
 
 ######################################################################################
 
+
 #Definition de la fonction d'envoi de message avec gestion d'erreur
 def EnvoiMessage(socket, message, adresse):
 
-    try:
-        socket.sendto(message, adresse)    # Envoi du message
+    #si le reseau est fiable, on envoie le message 
+    if FIABILITE == 1.0:
+        # Envoi du message
+        try:
+            socket.sendto(message, adresse)    # Envoi du message
+            print("Message envoyé")
+            print()
+        except OSError:
+            print("Taille du message trop grande")
 
+        except:
+            print(f"Erreur inconnue lors de l'envoi du message")
+            return
+    #sinon on simule une perte de message
+    else:
+        print("Message perdu")
+        return
+    # Affichage visuel de l'erreur
+
+######################################################################################
+
+
+#Definition de la fonction de reception de message avec gestion d'erreur
+def ReceptionMessage(socket):
+    socket.settimeout(DELAI_MAX)    # Delai d'attente maximal pour la reception d'un segment
+    try:
+        données, adresse = socket.recvfrom(1029)    # Reception du message
+        return données
+
+    except socket.timeout:
+        print("Delai d'attente depassé")    # Affichage visuel de l'erreur
 
     except OSError:
         print("Taille du message trop grande")
 
     except:
-        print(f"Erreur inconnue lors de l'envoi du message")    # Affichage visuel de l'erreur
+        print(f"Erreur inconnue lors de la reception du message")    # Affichage visuel de l'erreur
 
-######################################################################################
+
+    
+########################################################################################
+
 
 
 #Definition du generateur du checksum/hash avec la fonction de hachage sha1
@@ -108,7 +157,7 @@ def ProcessusPoigneDeMain(socket):
     print("********* Processus de poignée de main coté client **************")
 
     # Création du segment SYN
-    segment = CreationSegment(0,0,b"SYN",fenetrage,tailleMorçeau,signature_SYN,b"",b"SYN")
+    segment = CreationSegment(b"",0,0,b"SYN",fenetrage,tailleMorçeau,signature_SYN,b"",b"SYN")
     print()    
     print()
     # Envoi du SYN
@@ -118,10 +167,10 @@ def ProcessusPoigneDeMain(socket):
     print()
 
     # Réception du SYN-ACK
-    données, adresse = socket.recvfrom(1024)
+    données, adresse = socket.recvfrom(1029)
     
      # Extraction des informations du segment
-    numero_seq, numero_ack, drapeau, fenetrage1, tailleMorçeau1, checksum, nom_fichier, donnee = struct.unpack(format_entete, données)
+    commande,numero_seq, numero_ack, drapeau, fenetrage1, tailleMorçeau1, checksum, nom_fichier, donnee = struct.unpack(format_entete, données)
 
     #Nettoyage des donnees
     donnee = donnee.rstrip(b"\x00")
@@ -145,7 +194,7 @@ def ProcessusPoigneDeMain(socket):
             tailleMorçeau = tailleMorçeau1  
 
         #Creation et envoi du segment ACK / Finalisation  de la connexion
-        segment = CreationSegment(1, 1, b"ACK", fenetrage, tailleMorçeau, signature_ACK, b"", b"ACK")
+        segment = CreationSegment(b"",1, 1, b"ACK", fenetrage, tailleMorçeau, signature_ACK, b"", b"ACK")
         EnvoiMessage(socket, segment, address_serveur)
         print("ACK envoyé")
         print()
@@ -184,7 +233,7 @@ def ReceptionDonnees(socket,nom_fichier_reçu):
     with open (nom_fichier_reçu, "wb") as fichier_reçu:
         while True:
             données = socket.recv(1024)
-            numero_seq, numero_ack, drapeau, fenetrage1, mss1, checksum, nom_fichier, donnees = struct.unpack(format_entete, données)
+            commande,numero_seq, numero_ack, drapeau, fenetrage1, mss1, checksum, nom_fichier, donnees = struct.unpack(format_entete, données)
             donnée = donnees.rstrip(b"\x00")
             drapeau = drapeau.decode()
 

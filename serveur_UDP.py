@@ -21,6 +21,19 @@ sock_servr = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 sock_servr.bind((hote, port)) 
 
 
+##############################################################################################################
+#                #CONFIGURATIONS
+
+#Nombre d'essai maximal d'envoi de segment
+ESSAIES_MAX = 5
+
+#Delai d'attente maximal pour la reception d'un segment
+DELAI_MAX = 3
+
+#Fiabilité du reseau
+FIABILITE = round(random.choice([0.95, 1.0]),2) #remplacer par 1.0 pour simuler un reseau fiable
+print(f"Fiabilité du reseau: {FIABILITE}")
+print()
 
 #Parametres de l'entête
 
@@ -45,6 +58,10 @@ fenetrage_clt = 0
 checksum = b""
 nom_fichier = b""
 donnee = b""
+
+
+#################################################################################################
+
 
 
 #Fonction du generateur de signature hash
@@ -72,13 +89,13 @@ signature_SYN_ACK = GenerateurSignatureHash(b"SYN-ACK")
 
 #Definition parametre format de struct.pack
 # numero_seq(4 octets), numero_ack(4 octets), drapeau(3 octets), tailleMorçeau(4 octets), checksum(40 octets), nom_fichier(15 octets), donnee(204800 octets)
-format_entete = "!I I 3s I I 40s 15s 950s"     
+format_entete = "!5s I I 3s I I 40s 15s 950s"     
 
 #Definition de la fonction de creation de segment
-def CreationSegment(numero_seq, numero_ack, drapeau, fenetrage_srvr, tailleMorçeau, checksum, nom_fichier, donnee):
+def CreationSegment(commande,numero_seq, numero_ack, drapeau, fenetrage_srvr, tailleMorçeau, checksum, nom_fichier, donnee):
 
     #Empaquetage des parametres du segment
-    segment = struct.pack(format_entete, numero_seq, numero_ack, drapeau, fenetrage_srvr, tailleMorçeau, checksum, nom_fichier, donnee)
+    segment = struct.pack(format_entete, commande, numero_seq, numero_ack, drapeau, fenetrage_srvr, tailleMorçeau, checksum, nom_fichier, donnee)
     return segment
 
 
@@ -97,6 +114,29 @@ def EnvoiMessage(socket, message, adresse):
 
 ############################################################################################################
 
+
+#Definition de la fonction de reception de message avec gestion d'erreur
+def ReceptionMessage(socket):
+    socket.settimeout(DELAI_MAX)    # Delai d'attente maximal pour la reception d'un segment
+    try:
+        données, adresse = socket.recvfrom(1029)    # Reception du message
+        return données
+
+    except socket.timeout:
+        print("Delai d'attente depassé")    # Affichage visuel de l'erreur
+
+    except OSError:
+        print("Taille du message trop grande")
+
+    except:
+        print(f"Erreur inconnue lors de la reception du message")    # Affichage visuel de l'erreur
+
+
+
+##########################################################################
+
+
+
 # Fonction pour l'initiation de la connexion (processus de Three-way handshake)
 def ProcessusInitiationConnexion(socket):
 
@@ -107,10 +147,10 @@ def ProcessusInitiationConnexion(socket):
     print() 
     print()
     # Reception du segment SYN
-    donnée, adresse = socket.recvfrom(1024)
+    donnée, adresse = socket.recvfrom(1029)
     
     # Extraction des informations du segment
-    numero_seq, numero_ack, drapeau, fenetrage1, mss1, checksum, nom_fichier, donnee = struct.unpack(format_entete, donnée)
+    commande,numero_seq, numero_ack, drapeau, fenetrage1, mss1, checksum, nom_fichier, donnee = struct.unpack(format_entete, donnée)
 
     #Nettoyage des donnees
     donnee = donnee.rstrip(b"\x00")
@@ -130,7 +170,7 @@ def ProcessusInitiationConnexion(socket):
         print()
 
         #Creation et envoi du segment SYN-ACK / Negociation des parametres
-        segment = CreationSegment(0, 1, b"ACK", fenetrage_srvr, tailleMorçeau, signature_SYN_ACK, b"", b"SYN-ACK")
+        segment = CreationSegment(b"",0, 1, b"ACK", fenetrage_srvr, tailleMorçeau, signature_SYN_ACK, b"", b"SYN-ACK")
         EnvoiMessage(socket, segment, address_client)    # Envoi du SYN-ACK
         print("SYN-ACK envoyé")
         print()
@@ -142,10 +182,10 @@ def ProcessusInitiationConnexion(socket):
         print()
     
     # Reception du ACK
-    donnée, adresse = socket.recvfrom(1024)   # Reception du ACK
+    donnée, adresse = socket.recvfrom(1029)   # Reception du ACK
 
      # Extraction des informations reçues
-    numero_seq, numero_ack, drapeau, fenetrage1, tailleMorçeau, checksum, nom_fichier, donnee = struct.unpack(format_entete, donnée)
+    commande,numero_seq, numero_ack, drapeau, fenetrage1, tailleMorçeau, checksum, nom_fichier, donnee = struct.unpack(format_entete, donnée)
 
     #Nettoyage des donnees
     donnee = donnee.rstrip(b"\x00")
@@ -191,12 +231,12 @@ def EnvoiFichier(socket, nom_fichier):
     with open (nom_fichier, "rb") as fichier:    # Ouverture du fichier en mode lecture binaire
         morçeau = fichier.read(950)                # Lecture des octets
         while morçeau:                             # Boucle pour lire tous les octets
-                segment =  CreationSegment(numero_seq, numero_ack, b"", fenetrage_srvr, tailleMorçeau, GenerateurSignatureHash(morçeau), b"", morçeau)
+                segment =  CreationSegment(b"",numero_seq, numero_ack, b"", fenetrage_srvr, tailleMorçeau, GenerateurSignatureHash(morçeau), b"", morçeau)
                 socket.send(segment)         # Envoi des octets
                 morçeau = fichier.read(950)        # Lecture des octets pour controler la boucle
         
         # Envoi du segment de fin
-        segment = CreationSegment(numero_seq, numero_ack, b"FIN", fenetrage_srvr, tailleMorçeau, GenerateurSignatureHash(b"FIN"), b"", b"")
+        segment = CreationSegment(b"",numero_seq, numero_ack, b"FIN", fenetrage_srvr, tailleMorçeau, GenerateurSignatureHash(b"FIN"), b"", b"")
         socket.send(segment)         # Envoi du segment de fin
         print("Fichier envoyé")                    
     print()

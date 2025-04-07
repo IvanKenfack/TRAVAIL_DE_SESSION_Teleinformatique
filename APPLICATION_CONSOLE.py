@@ -59,7 +59,7 @@ donnee = b""
 
 #Definition du parametre format de struct.pack
 # network byte order numero_seq(4 octets), numero_ack(4 octets), drapeau(3 octets), tailleMorçeau(4 octets), checksum(40 octets), nom_fichier(15 octets), donnee({tailleMorceau} octets)
-format_entete = f"!5s I I 3s I I 40s 15s 950s"     
+format_entete = f"!15s I I 3s I I 40s 15s 940s"     
 
 
 ########################################################################################
@@ -95,10 +95,31 @@ def EnvoiMessage(socket, message, adresse):
     else:
         print("Message perdu")
         return
-    # Affichage visuel de l'erreur
+    
 
 ######################################################################################
 
+
+#Definition de la fonction d'envoi de message avec connexion établie
+def EnvoiMessageAvecConnexion(socket, message):
+
+    #si le reseau est fiable, on envoie le message 
+    if FIABILITE == 1.0:
+        # Envoi du message
+        try:
+            socket.send(message)    # Envoi du message
+            print("Message envoyé")
+            print()
+        except OSError:
+            print("Taille du message trop grande")
+
+        except:
+            print(f"Erreur inconnue lors de l'envoi du message")
+            return
+    #sinon on simule une perte de message
+    else:
+        print("Message perdu")
+        return
 
 
 #Definition du generateur du checksum/hash avec la fonction de hachage sha1
@@ -132,13 +153,13 @@ signature_SYN_ACK = GenerateurSignatureHash(b"SYN-ACK")
 def ProcessusPoigneDeMain(socket):
 
     #Pour le passage par reference
-    global tailleMorçeau,fenetrage_srvr,fenetrage
+    global tailleMorçeau,fenetrage_srvr,fenetrage,numero_seq,numero_ack
     
     print()
     print("********* Processus de poignée de main coté client **************")
 
     # Création du segment SYN
-    segment = CreationSegment(b"",0,0,b"SYN",fenetrage,tailleMorçeau,signature_SYN,b"",b"SYN")
+    segment = CreationSegment(b"",numero_seq,numero_ack,b"SYN",fenetrage,tailleMorçeau,signature_SYN,b"",b"SYN")
 
     print()    
     print()
@@ -196,19 +217,22 @@ def ProcessusPoigneDeMain(socket):
     if GenerateurSignatureHash(donnee) == checksum.rstrip(b"\x00"):
         print("SYN_ACK reçu")
         print()
-        print("Numero de sequence : {}".format(numero_seq))
-        print("Numero d'acquittement : {}".format(numero_ack))
-        print("Drapeau : {}".format(drapeau))
-        print("Fenetrage_serveur : {}".format(fenetrage1))
-        print("MSS : {}".format(tailleMorçeau1+74)) 
+        print("Numero de sequence reçu: {}".format(numero_seq))
+        print("Numero d'acquittement reçu: {}".format(numero_ack))
+        print("Drapeau reçu: {}".format(drapeau))
+        print("Fenetrage_serveur reçu: {}".format(fenetrage1))
+        print("MSS reçu: {}".format(tailleMorçeau1+74)) 
         print()
 
         #Logique de négociation
         if tailleMorçeau1 < tailleMorçeau:
-                tailleMorçeau = tailleMorçeau1  
+                tailleMorçeau = tailleMorçeau1 
+
+        numero_seq = 1
+        numero_ack = 1 
 
         #Creation et envoi du segment ACK / Finalisation  de la connexion
-        segment = CreationSegment(b"",1, 1, b"ACK", fenetrage, tailleMorçeau, signature_ACK, b"", b"ACK")
+        segment = CreationSegment(b"",numero_seq, numero_ack, b"ACK", fenetrage, tailleMorçeau, signature_ACK, b"", b"ACK")
         EnvoiMessage(socket, segment, address_serveur)
         print("ACK envoyé")
         print()
@@ -218,7 +242,8 @@ def ProcessusPoigneDeMain(socket):
       
     #Sinon il y'a affichage d'un message d'erreur
     else:
-        print("SYN-ACK mal reçu")
+        print("SYN-ACK reçu corrompu")
+        print()
         print("Echec du processus de poignée de main")
         print()
     
@@ -237,6 +262,36 @@ def ProcessusPoigneDeMain(socket):
 ######################################################################################
 
 
+
+#Fonction pour la reception des données
+def ReceptionDonnees(socket,nom_fichier_reçu):
+
+    global format_entete
+
+    print()
+    print ("Reception des données")
+    print()
+
+    with open (nom_fichier_reçu, "wb") as fichier_reçu:
+        while True:
+            données = socket.recv(1029)
+            commande,numero_seq, numero_ack, drapeau, fenetrage1, mss1, checksum, nom_fichier, donnees = struct.unpack(format_entete, données)
+            donnée = donnees.rstrip(b"\x00")
+            drapeau = drapeau.decode()
+
+            #Verificatio de la fin du fichier
+            if drapeau == "FIN":
+                print("FIN du fichier reçu")
+                break
+            fichier_reçu.write(donnée)
+    print()
+    print("Fichier reçu avec success")
+
+
+#################################################################################
+
+                                   
+                                    #PROGRAMME PRINCIPAL
 
 
 # Boucle infinie pour l'envoi des commandes
@@ -259,27 +314,112 @@ while True:
 
     #Conversion de la commande en bytes
     commande = commande.encode('utf-8')
-
-    segment = CreationSegment(commande, numero_seq, numero_ack, b"", fenetrage, tailleMorçeau, checksum, nom_fichier, donnee)
-
-
     print()
+
+    numero_seq = numero_ack + 1
+    # Creation du segment
+    segment = CreationSegment(commande, numero_seq, numero_ack, b"", fenetrage, tailleMorçeau, b"", b"", b"")
+
 
     # Si la commande est "bye" ou "4", on ferme la connexion
     if commande == b"bye" or commande == b"4":
 
          # Envoi de la commande
-        sock_client1.send(commande.encode())   
+        segment = CreationSegment(b"bye", numero_seq, numero_ack, b"", fenetrage, tailleMorçeau, b"", b"", b"")
+        EnvoiMessageAvecConnexion(sock_client1, segment)
+        print("Commande bye envoyée")
+        print()
+        
+        sock_client1.settimeout(DELAI_MAX)
+        try:
+            # Réception de la confirmation de reception
+            données = sock_client1.recv(1029)
+            print("Commande bye reçue")
+            print()
+        except sock_client1.timeout:
+            print("Delai d'attente depassé")
+            print()
+            print("Reexpedition de la commande bye")
+            print()
+            for index in range(ESSAIES_MAX):
+                EnvoiMessageAvecConnexion(socket, segment)
+                print("Tentative de renvoi de la commande bye n° {}".format(index+1))
+                print()
+                sock_client1.settimeout(DELAI_MAX)
+                try:
+                    données, adresse = socket.recvfrom(1029)
+                    break
+                except sock_client1.timeout:
+                    if index == ESSAIES_MAX - 1:
+                        print("Echec de la connexion")
+                        print()
+                        sock_client1.close()
+                        print("Connexion terminée")
+                    
+                    print("Delai d'attente depassé")
+                    print()
+                    continue
+
         sock_client1.close()    # Fermeture du socket
         print("Connexion fermée")    # Affichage visuel de la connexion fermée
         break
 
     # Si la commande est "ls" ou "2", on affiche la liste des fichiers disponibles
     elif commande == b"ls" or commande == b"2":
-        sock_client1.send(commande.encode())
+
+        # Envoi de la commande
+        EnvoiMessageAvecConnexion(sock_client1, segment)
+        print("Commande ls envoyée")
+
+        #Attente de la confirmation de reception
+        sock_client1.settimeout(DELAI_MAX)
+
+        try:
+            # Réception de la liste des fichiers
+            données = sock_client1.recv(1029)
+            # Extraction des informations du segment
+            commande,numero_seq, numero_ack, drapeau, fenetrage1, tailleMorçeau1, checksum, nom_fichier, donnee = struct.unpack(format_entete, données)
+            commande = commande.rstrip(b"\x00")
+
+            if signature_ACK == checksum.rstrip(b"\x00"):
+
+                print("commande ls reçue")
+                print()
+            else:
+                print("commande ls corrompue")
+                print()
+                print("Echec de la reception de la commande ls")
+                print()
+                sock_client1.close()
+                break
+
+        except sock_client1.timeout:
+            print("Delai d'attente depassé")
+            print()
+            print("Reexpedition de la commande ls")
+            print()
+            for index in range(ESSAIES_MAX):
+                EnvoiMessageAvecConnexion(socket, segment)
+                print("Tentative de renvoi de la commande ls n° {}".format(index+1))
+                print()
+                sock_client1.settimeout(DELAI_MAX)
+                try:
+                    données, adresse = socket.recvfrom(1029)
+                    break
+                except sock_client1.timeout:
+                    if index == ESSAIES_MAX - 1:
+                        print("Echec de la connexion")
+                        print()
+                        sock_client1.close()
+                        print("Connexion terminée")
+                    
+                    print("Delai d'attente depassé")
+                    print()
+                    continue
+
         
         # Reception des données
-        données = sock_client1.recv(1024).decode('utf-8')
+        données = sock_client1.recv(1029).decode('utf-8')
         print()
         print("****** Liste des fichiers disponibles ******")
         print()
@@ -289,20 +429,63 @@ while True:
 
     # Si la commande est "open localhost" ou "open
     elif commande == b"open localhost" or commande == b"open 127.0.0.1" or commande == "1":
-        sock_client1.sendto(commande.encode(), address_serveur)    # Envoi de la commande
+
+        # Envoi de la commande
+        EnvoiMessage(sock_client1, segment, address_serveur)
+        print("Commande open localhost envoyée")
+        print()
+        print()
         ProcessusPoigneDeMain(sock_client1)        # Appel de la fonction ProcessusPoigneDeMain
 
 
 
     elif commande == b"get" or commande == b"3":
         nom_fichier = input("Entrez le nom du fichier à télécharger: ")
-        print() 
-        sock_client1.send(commande.encode())    # Envoi de la commande
-
-        # Envoi du nom du fichier à télécharger
-        sock_client1.send(nom_fichier.encode())
         print()
-        print("Nom du fichier voulu envoyé")
+
+        commande = b"get"
+        nom_fichier = nom_fichier.encode('utf-8')
+
+        numero_seq = numero_ack
+        # Creation du segment
+        segment = CreationSegment(commande, numero_seq, numero_ack, b"", fenetrage, tailleMorçeau, b"", nom_fichier, b"")
+        
+        # Envoi de la commande
+        EnvoiMessageAvecConnexion(sock_client1, segment)
+        print("Commande get envoyée pour le fichier {}".format(nom_fichier.decode('utf-8')))
+        print()
+
+        sock_client1.settimeout(DELAI_MAX)
+        try:
+            # Réception de la confirmation de reception
+            données = sock_client1.recv(1029)
+            print("Commande get reçue")
+            print()
+        except sock_client1.timeout:
+            print("Delai d'attente depassé")
+            print()
+            print("Reexpedition de la commande get")
+            print()
+            for index in range(ESSAIES_MAX):
+                EnvoiMessageAvecConnexion(socket, segment)
+                print("Tentative de renvoi de la commande get n° {}".format(index+1))
+                print()
+                sock_client1.settimeout(DELAI_MAX)
+                try:
+                    données, adresse = socket.recvfrom(1029)
+                    break
+                except sock_client1.timeout:
+                    if index == ESSAIES_MAX - 1:
+                        print("Echec de la connexion")
+                        print()
+                        sock_client1.close()
+                        print("Connexion terminée")
+                    
+                    print("Delai d'attente depassé")
+                    print()
+                    print("Tentative de reexpedition du segment SYN-ACK numero {}".format(index+1))
+                    continue
+
 
         # Je modifie le nom du fichier à la reception pour eviter les conflits d'ecriture (le fichier source étant dans le meme repertoire)
         nom, extension = os.path.splitext(nom_fichier)

@@ -21,9 +21,24 @@ sock_servr = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 sock_servr.bind((hote, port)) 
 
 
+##############################################################################################################
+#                #CONFIGURATIONS
+
+#Nombre d'essai maximal d'envoi de segment
+ESSAIES_MAX = 5
+
+#Delai d'attente maximal pour la reception d'un segment
+DELAI_MAX = 3
+
+#Fiabilité du reseau
+FIABILITE = round(random.choice([0.95, 1.0]),2) #remplacer par 1.0 pour simuler un reseau fiable
+print(f"Fiabilité du reseau: {FIABILITE}")
+print()
 
 #Parametres de l'entête
 
+#Commande
+commande = b""
 #Numero de sequence
 numero_seq = 0
 #Numero d'acquittement
@@ -35,7 +50,7 @@ drapeau = b""
 tailleMorçeau = 200 #random.randint(274,280)     #204874 
 
 #Taille de la fenetre generé aléatoirement pour simuler la mutabilité de ce dernier dependament de la connexion
-# limité entre le tailleMorçeau et tailleMorçeau*2 pour éviter de gérer le windows scaling le serveur ne recois pas grand chose du client
+# limité entre la tailleMorçeau et tailleMorçeau*2 pour éviter de gérer le windows scaling le serveur ne recois pas grand chose du client
 fenetrage_srvr = random.randint(274,548)
 #fentrage recu du client
 fenetrage_clt = 0
@@ -43,6 +58,10 @@ fenetrage_clt = 0
 checksum = b""
 nom_fichier = b""
 donnee = b""
+
+
+#################################################################################################
+
 
 
 #Fonction du generateur de signature hash
@@ -70,13 +89,13 @@ signature_SYN_ACK = GenerateurSignatureHash(b"SYN-ACK")
 
 #Definition parametre format de struct.pack
 # numero_seq(4 octets), numero_ack(4 octets), drapeau(3 octets), tailleMorçeau(4 octets), checksum(40 octets), nom_fichier(15 octets), donnee(204800 octets)
-format_entete = "!I I 3s I I 40s 15s 950s"     
+format_entete = "!5s I I 3s I I 40s 15s 950s"     
 
 #Definition de la fonction de creation de segment
-def CreationSegment(numero_seq, numero_ack, drapeau, fenetrage_srvr, tailleMorçeau, checksum, nom_fichier, donnee):
+def CreationSegment(commande,numero_seq, numero_ack, drapeau, fenetrage_srvr, tailleMorçeau, checksum, nom_fichier, donnee):
 
     #Empaquetage des parametres du segment
-    segment = struct.pack(format_entete, numero_seq, numero_ack, drapeau, fenetrage_srvr, tailleMorçeau, checksum, nom_fichier, donnee)
+    segment = struct.pack(format_entete, commande, numero_seq, numero_ack, drapeau, fenetrage_srvr, tailleMorçeau, checksum, nom_fichier, donnee)
     return segment
 
 
@@ -95,6 +114,7 @@ def EnvoiMessage(socket, message, adresse):
 
 ############################################################################################################
 
+
 # Fonction pour l'initiation de la connexion (processus de Three-way handshake)
 def ProcessusInitiationConnexion(socket):
 
@@ -105,10 +125,10 @@ def ProcessusInitiationConnexion(socket):
     print() 
     print()
     # Reception du segment SYN
-    donnée, adresse = socket.recvfrom(1024)
+    donnée, adresse = socket.recvfrom(1029)
     
     # Extraction des informations du segment
-    numero_seq, numero_ack, drapeau, fenetrage1, mss1, checksum, nom_fichier, donnee = struct.unpack(format_entete, donnée)
+    commande,numero_seq, numero_ack, drapeau, fenetrage1, mss1, checksum, nom_fichier, donnee = struct.unpack(format_entete, donnée)
 
     #Nettoyage des donnees
     donnee = donnee.rstrip(b"\x00")
@@ -128,22 +148,58 @@ def ProcessusInitiationConnexion(socket):
         print()
 
         #Creation et envoi du segment SYN-ACK / Negociation des parametres
-        segment = CreationSegment(0, 1, b"ACK", fenetrage_srvr, tailleMorçeau, signature_SYN_ACK, b"", b"SYN-ACK")
+        segment = CreationSegment(b"",0, 1, b"ACK", fenetrage_srvr, tailleMorçeau, signature_SYN_ACK, b"", b"SYN-ACK")
+
         EnvoiMessage(socket, segment, address_client)    # Envoi du SYN-ACK
         print("SYN-ACK envoyé")
         print()
 
+        #On attends une confirmation de reception(SYN-ACK) pendant 3 secondes
+        socket.settimeout(DELAI_MAX)
+        try:
+            # Réception du SYN-ACK
+            données, adresse = socket.recvfrom(1029)
+
+        # Si le segment n'est pas reçu dans le delai imparti, on renvoie le segment SYN a 5 reprises    
+        except socket.timeout:
+            print("Delai d'attente depassé")
+            print()
+            print("Reexpedition du segment SYN-ACK ")
+            print()
+
+            for index in range(ESSAIES_MAX):
+                EnvoiMessage(socket, segment, address_serveur)
+                print("SYN réenvoyé")
+                print()
+                socket.settimeout(DELAI_MAX)
+                try:
+                    données, adresse = socket.recvfrom(1029)
+                    break
+                except socket.timeout:
+                    if index == ESSAIES_MAX - 1:
+                        print("Echec de la connexion")
+                        print()
+                        print("Connexion terminée")
+                        socket.close()
+                        return
+                    
+                    print("Delai d'attente depassé")
+                    print()
+                    print("Tentative de reexpedition du segment SYN-ACK numero {}".format(index+1))
+                    continue
+
     #Sinon il y'a affichage d'un message d'erreur
     else:
-        print("SYN non reçu")
+        print("SYN mal reçu")
+
         print("Echec du processus de poignée de main")
         print()
     
     # Reception du ACK
-    donnée, adresse = socket.recvfrom(1024)   # Reception du ACK
+    donnée, adresse = socket.recvfrom(1029)   # Reception du ACK
 
      # Extraction des informations reçues
-    numero_seq, numero_ack, drapeau, fenetrage1, tailleMorçeau, checksum, nom_fichier, donnee = struct.unpack(format_entete, donnée)
+    commande,numero_seq, numero_ack, drapeau, fenetrage1, tailleMorçeau, checksum, nom_fichier, donnee = struct.unpack(format_entete, donnée)
 
     #Nettoyage des donnees
     donnee = donnee.rstrip(b"\x00")
@@ -170,7 +226,7 @@ def ProcessusInitiationConnexion(socket):
         print()
 
     else:
-        print("ACK non reçu")
+        print("ACK mal reçu")
         print("Echec du processus de poignée de main")
         print()
     
@@ -189,12 +245,12 @@ def EnvoiFichier(socket, nom_fichier):
     with open (nom_fichier, "rb") as fichier:    # Ouverture du fichier en mode lecture binaire
         morçeau = fichier.read(950)                # Lecture des octets
         while morçeau:                             # Boucle pour lire tous les octets
-                segment =  CreationSegment(numero_seq, numero_ack, b"", fenetrage_srvr, tailleMorçeau, GenerateurSignatureHash(morçeau), b"", morçeau)
+                segment =  CreationSegment(b"",numero_seq, numero_ack, b"", fenetrage_srvr, tailleMorçeau, GenerateurSignatureHash(morçeau), b"", morçeau)
                 socket.send(segment)         # Envoi des octets
                 morçeau = fichier.read(950)        # Lecture des octets pour controler la boucle
         
         # Envoi du segment de fin
-        segment = CreationSegment(numero_seq, numero_ack, b"FIN", fenetrage_srvr, tailleMorçeau, GenerateurSignatureHash(b"FIN"), b"", b"")
+        segment = CreationSegment(b"",numero_seq, numero_ack, b"FIN", fenetrage_srvr, tailleMorçeau, GenerateurSignatureHash(b"FIN"), b"", b"")
         socket.send(segment)         # Envoi du segment de fin
         print("Fichier envoyé")                    
     print()
@@ -202,6 +258,8 @@ def EnvoiFichier(socket, nom_fichier):
 
 ############################################################################################################   
  
+
+# Affichage visuel de l'état initial du serveur
 print()
 print("Le serveur est en écoute sur le port {}".format(port))      # Affichage visuel de l'état du serveur
 print()
@@ -210,9 +268,9 @@ print()
 
 # Boucle infinie pour recevoir les messages des clients
 while True:
-    commande, adresse = sock_servr.recvfrom(1024)   # Reception demande de connection
+    commande, adresse = sock_servr.recvfrom(1029)   # Reception demande de connection
     commande = commande.decode('utf-8')
-    
+
     # si commande = open localhost ou open 127.0.0.1
     if commande == "open localhost" or commande == "open 127.0.0.1" or commande == "1":
         print("Demande de connection reçue de la part de {}".format(adresse))
@@ -275,7 +333,6 @@ while True:
         print("Commande non reconnue")
         print()
         continue
-
 
 
 

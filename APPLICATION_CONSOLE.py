@@ -20,9 +20,24 @@ address_serveur = ('localhost', 2212)
 # Liaison du socket à une adresse IP et un port
 sock_client1.bind((hote, port))
 
+#####################################################
+               #CONFIGURATIONS
+
+#Nombre d'essais d'envoi de segment
+ESSAIES_MAX = 5
+
+#Delai d'attente maximal avant de renvoyer le segment
+DELAI_MAX = 3
+
+#Fiabilité du reseau
+FIABILITE = 1#round(random.choice([0.95, 1.0]),2)   #remplacer par 1.0 pour simuler un reseau fiable
+print(f"Fiabilité du reseau: {FIABILITE}")
+print()
 
 #Parametres de l'entête du segment
 
+#Commande
+commande = b""
 #Numero de sequence
 numero_seq = 0   
 #Numero d'acquittement
@@ -30,7 +45,7 @@ numero_ack = 0
 #Drapeau/code de controle
 drapeau = b""
 #Taille maximal du segment/Maximum segment size
-tailleMorçeau = 200 #random.randint(274,280)
+tailleMorçeau = 745 #random.randint(274,280)
 #Taille de la fenetre du client
 fenetrage =  random.randint(65486,65536)     #tailleMorçeau * 239  #65486
 
@@ -44,31 +59,47 @@ donnee = b""
 
 #Definition du parametre format de struct.pack
 # network byte order numero_seq(4 octets), numero_ack(4 octets), drapeau(3 octets), tailleMorçeau(4 octets), checksum(40 octets), nom_fichier(15 octets), donnee({tailleMorceau} octets)
-format_entete = f"!I I 3s I I 40s 15s 950s"     
+format_entete = f"!5s I I 3s I I 40s 15s 950s"     
+
+
+########################################################################################
+
 
 #Definition de la fonction de creation de segment
-def CreationSegment(numero_seq, numero_ack, drapeau, fenetrage, tailleMorçeau, checksum, nom_fichier, donnee):
+def CreationSegment(commande,numero_seq, numero_ack, drapeau, fenetrage, tailleMorçeau, checksum, nom_fichier, donnee):
 
     #Empaquetage des donnèes du segment
-    segment = struct.pack(format_entete, numero_seq, numero_ack, drapeau, fenetrage, tailleMorçeau, checksum, nom_fichier, donnee)
+    segment = struct.pack(format_entete, commande, numero_seq, numero_ack, drapeau, fenetrage, tailleMorçeau, checksum, nom_fichier, donnee)
     return segment
 
 ######################################################################################
 
+
 #Definition de la fonction d'envoi de message avec gestion d'erreur
 def EnvoiMessage(socket, message, adresse):
 
-    try:
-        socket.sendto(message, adresse)    # Envoi du message
-        #print("Message envoyé")    # Affichage visuel de l'état du serveur
+    #si le reseau est fiable, on envoie le message 
+    if FIABILITE == 1.0:
+        # Envoi du message
+        try:
+            socket.sendto(message, adresse)    # Envoi du message
+            print("Message envoyé")
+            print()
+        except OSError:
+            print("Taille du message trop grande")
 
-    except OSError:
-        print("Taille du message trop grande")
-
-    except:
-        print(f"Erreur inconnue lors de l'envoi du message")    # Affichage visuel de l'erreur
+        except:
+            print(f"Erreur inconnue lors de l'envoi du message")
+            return
+    #sinon on simule une perte de message
+    else:
+        print("Message perdu")
+        return
+    # Affichage visuel de l'erreur
 
 ######################################################################################
+
+
 
 #Definition du generateur du checksum/hash avec la fonction de hachage sha1
 def GenerateurSignatureHash(donnee):
@@ -85,6 +116,8 @@ def GenerateurSignatureHash(donnee):
     #retourne la signature
     return signature
 
+
+########################################################################################
 
 #Calcul et assignation des signatures de quelques parametres
 signature_SYN = GenerateurSignatureHash(b"SYN")
@@ -105,7 +138,8 @@ def ProcessusPoigneDeMain(socket):
     print("********* Processus de poignée de main coté client **************")
 
     # Création du segment SYN
-    segment = CreationSegment(0,0,b"SYN",fenetrage,tailleMorçeau,signature_SYN,b"",b"SYN")
+    segment = CreationSegment(b"",0,0,b"SYN",fenetrage,tailleMorçeau,signature_SYN,b"",b"SYN")
+
     print()    
     print()
     # Envoi du SYN
@@ -114,15 +148,47 @@ def ProcessusPoigneDeMain(socket):
     print()
     print()
 
-    # Réception du SYN-ACK
-    données, adresse = socket.recvfrom(1024)
-    
-     # Extraction des informations du segment
-    numero_seq, numero_ack, drapeau, fenetrage1, tailleMorçeau1, checksum, nom_fichier, donnee = struct.unpack(format_entete, données)
+    #On attends une confirmation de reception(SYN-ACK) pendant 3 secondes
+    socket.settimeout(DELAI_MAX)
+    try:
+        # Réception du SYN-ACK
+        données, adresse = socket.recvfrom(1029)
+
+    # Si le segment n'est pas reçu dans le delai imparti, on renvoie le segment SYN a 5 reprises    
+    except socket.timeout:
+        print("Delai d'attente depassé")
+        print()
+        print("Reexpedition du segment SYN ")
+        print()
+
+        for index in range(ESSAIES_MAX):
+            EnvoiMessage(socket, segment, address_serveur)
+            print("Tentive de renvoi du segment SYN n° {}".format(index+1))
+            print()
+            socket.settimeout(DELAI_MAX)
+            try:
+                données, adresse = socket.recvfrom(1029)
+                break
+            except socket.timeout:
+                if index == ESSAIES_MAX:
+                    print("Echec de la poignée de main")
+                    print()
+                    print("Connexion terminée")
+                    socket.close()
+                    return
+                
+                print("Delai d'attente depassé")
+                print()
+                print("Reexpedition du segment SYN ")
+                continue
+              
+
+    # Extraction des informations du segment
+    commande,numero_seq, numero_ack, drapeau, fenetrage1, tailleMorçeau1, checksum, nom_fichier, donnee = struct.unpack(format_entete, données)
 
     #Nettoyage des donnees
     donnee = donnee.rstrip(b"\x00")
-    
+        
     #Modification fenetrage serveur
     fenetrage_srvr = fenetrage1
 
@@ -139,18 +205,20 @@ def ProcessusPoigneDeMain(socket):
 
         #Logique de négociation
         if tailleMorçeau1 < tailleMorçeau:
-            tailleMorçeau = tailleMorçeau1  
+                tailleMorçeau = tailleMorçeau1  
 
         #Creation et envoi du segment ACK / Finalisation  de la connexion
-        segment = CreationSegment(1, 1, b"ACK", fenetrage, tailleMorçeau, signature_ACK, b"", b"ACK")
+        segment = CreationSegment(b"",1, 1, b"ACK", fenetrage, tailleMorçeau, signature_ACK, b"", b"ACK")
         EnvoiMessage(socket, segment, address_serveur)
         print("ACK envoyé")
         print()
+
+
         print()
       
     #Sinon il y'a affichage d'un message d'erreur
     else:
-        print("SYN non reçu")
+        print("SYN-ACK mal reçu")
         print("Echec du processus de poignée de main")
         print()
     
@@ -167,32 +235,6 @@ def ProcessusPoigneDeMain(socket):
 
 
 ######################################################################################
-
-
-#Fonction pour la reception des données
-def ReceptionDonnees(socket,nom_fichier_reçu):
-
-    global format_entete
-
-    print()
-    print ("Reception des données")
-    print()
-
-    with open (nom_fichier_reçu, "wb") as fichier_reçu:
-        while True:
-            données = socket.recv(1024)
-            numero_seq, numero_ack, drapeau, fenetrage1, mss1, checksum, nom_fichier, donnees = struct.unpack(format_entete, données)
-            donnée = donnees.rstrip(b"\x00")
-            drapeau = drapeau.decode()
-
-            #Verificatio de la fin du fichier
-            if drapeau == "FIN":
-                print("FIN du fichier reçu")
-                break
-            fichier_reçu.write(donnée)
-    print()
-    print("Fichier reçu avec success")
-
 
 
 
@@ -214,10 +256,17 @@ while True:
     print("Veuillez entrer une commande")
     print()
     commande = input("Commande: ")
+
+    #Conversion de la commande en bytes
+    commande = commande.encode('utf-8')
+
+    segment = CreationSegment(commande, numero_seq, numero_ack, b"", fenetrage, tailleMorçeau, checksum, nom_fichier, donnee)
+
+
     print()
 
     # Si la commande est "bye" ou "4", on ferme la connexion
-    if commande == "bye" or commande == "4":
+    if commande == b"bye" or commande == b"4":
 
          # Envoi de la commande
         sock_client1.send(commande.encode())   
@@ -226,7 +275,7 @@ while True:
         break
 
     # Si la commande est "ls" ou "2", on affiche la liste des fichiers disponibles
-    if commande == "ls" or commande == "2":
+    elif commande == b"ls" or commande == b"2":
         sock_client1.send(commande.encode())
         
         # Reception des données
@@ -239,13 +288,13 @@ while True:
         print()
 
     # Si la commande est "open localhost" ou "open
-    elif commande == "open localhost" or commande == "open 127.0.0.1" or commande == "1":
+    elif commande == b"open localhost" or commande == b"open 127.0.0.1" or commande == "1":
         sock_client1.sendto(commande.encode(), address_serveur)    # Envoi de la commande
         ProcessusPoigneDeMain(sock_client1)        # Appel de la fonction ProcessusPoigneDeMain
 
 
 
-    elif commande == "get" or commande == "3":
+    elif commande == b"get" or commande == b"3":
         nom_fichier = input("Entrez le nom du fichier à télécharger: ")
         print() 
         sock_client1.send(commande.encode())    # Envoi de la commande
@@ -253,9 +302,9 @@ while True:
         # Envoi du nom du fichier à télécharger
         sock_client1.send(nom_fichier.encode())
         print()
-        print("Nom du fichier envoyé")
+        print("Nom du fichier voulu envoyé")
 
-        # Je modifie le nom du fichier à la reception pour eviter les conflits d'ecriture
+        # Je modifie le nom du fichier à la reception pour eviter les conflits d'ecriture (le fichier source étant dans le meme repertoire)
         nom, extension = os.path.splitext(nom_fichier)
         fichier_reçu = f"{nom}_reçu{extension}"
         print()

@@ -281,7 +281,7 @@ def ReceptionDonnees(socket,nom_fichier_reçu):
 
             #Verification de la fin du fichier
             if drapeau == "FIN":
-                print("FIN du fichier reçu")
+                print("FIN du fichier")
                 break
             fichier_reçu.write(donnée)
     print()
@@ -379,7 +379,6 @@ while True:
             données = sock_client1.recv(1029)
             # Extraction des informations du segment
             commande,numero_seq, numero_ack, drapeau, fenetrage1, tailleMorçeau1, checksum, nom_fichier, donnee = struct.unpack(format_entete, données)
-            drapeau = drapeau.rstrip(b"\x00")
 
             if signature_ACK == checksum.rstrip(b"\x00"):
 
@@ -404,7 +403,10 @@ while True:
                 print()
                 sock_client1.settimeout(DELAI_MAX)
                 try:
-                    données, adresse = sock_client1.recvfrom(1029)
+                    données = sock_client1.recv(1029)
+                    # Extraction des informations du segment
+                    commande,numero_seq, numero_ack, drapeau, fenetrage1, tailleMorçeau1, checksum, nom_fichier, donnee = struct.unpack(format_entete, données)
+
                     break
                 except socket.timeout:
                     if index == ESSAIES_MAX - 1:
@@ -419,15 +421,17 @@ while True:
 
         
         # Reception des données
-        #données = sock_client1.recv(1029).decode('utf-8')
+        données = sock_client1.recv(1029)
+        # Extraction des informations du segment
+        commande,numero_seq, numero_ack, drapeau, fenetrage1, tailleMorçeau1, checksum, nom_fichier, donnee = struct.unpack(format_entete, données)
         donnee = donnee.rstrip(b"\x00")
         donnee = donnee.decode('utf-8')
         print()
         print("****** Liste des fichiers disponibles ******")
         print()
-        print(données)
+        print(donnee)
         print()
-        print()
+        print() 
 
     # Si la commande est "open localhost" ou "open
     elif commande == b"open localhost" or commande == b"open 127.0.0.1" or commande == b"1":

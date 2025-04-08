@@ -30,7 +30,7 @@ ESSAIES_MAX = 5
 DELAI_MAX = 3
 
 #Fiabilité du reseau
-FIABILITE = round(random.choice([0.95, 1.0]),2) #remplacer par 1.0 pour simuler un reseau fiable
+FIABILITE = 1#round(random.choice([0.95, 1.0]),2) #remplacer par 1.0 pour simuler un reseau fiable
 print(f"Fiabilité du reseau: {FIABILITE}")
 print()
 
@@ -252,7 +252,8 @@ def EnvoiFichier(socket, nom_fichier):
         morçeau = fichier.read(930) 
         i = 0               # Lecture des octets
         while morçeau:
-                print (f"Iteration {i+1}, taille morceau : {len(morçeau)}")                             # Boucle pour lire tous les octets
+                #print (f"Iteration {i+1}, taille morceau : {len(morçeau)}") 
+                                            # Boucle pour lire tous les octets
                 segment =  CreationSegment(b"",numero_seq, numero_ack, b"", fenetrage_srvr, len(morçeau), GenerateurSignatureHash(morçeau), b"", morçeau)
                 socket.send(segment)         # Envoi des octets
                 morçeau = fichier.read(930)        # Lecture des octets pour controler la boucle
@@ -261,7 +262,7 @@ def EnvoiFichier(socket, nom_fichier):
         # Envoi du segment de fin
         segment = CreationSegment(b"",numero_seq, numero_ack, b"FIN", fenetrage_srvr, tailleMorçeau, GenerateurSignatureHash(b"FIN"), b"", b"")
         socket.send(segment)         # Envoi du segment de fin
-        print("Fichier envoyé")                    
+        print("Fichier envoyé")                     
     print()
 
 

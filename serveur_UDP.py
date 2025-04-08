@@ -88,7 +88,7 @@ signature_SYN_ACK = GenerateurSignatureHash(b"SYN-ACK")
 
 #Definition parametre format de struct.pack
 # numero_seq(4 octets), numero_ack(4 octets), drapeau(3 octets), tailleMorçeau(4 octets), checksum(40 octets), nom_fichier(15 octets), donnee(204800 octets)
-format_entete = "!25s I I 3s I I 40s 15s 930s"     
+format_entete = "!25s I I 3s I I 40s 24s 920s"     
 
 #Definition de la fonction de creation de segment
 def CreationSegment(commande,numero_seq, numero_ack, drapeau, fenetrage_srvr, tailleMorçeau, checksum, nom_fichier, donnee):
@@ -131,7 +131,7 @@ def ProcessusInitiationConnexion(socket):
 
     #Nettoyage des donnees
     donnee = donnee.rstrip(b"\x00")
-    
+    print(donnee)
     #Modification du fenetrage client
     fenetrage_clt = fenetrage1
 

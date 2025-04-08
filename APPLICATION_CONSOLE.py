@@ -59,7 +59,7 @@ donnee = b""
 
 #Definition du parametre format de struct.pack
 # network byte order numero_seq(4 octets), numero_ack(4 octets), drapeau(3 octets), tailleMorçeau(4 octets), checksum(40 octets), nom_fichier(15 octets), donnee({tailleMorceau} octets)
-format_entete = f"!25s I I 3s I I 40s 15s 930s"     
+format_entete = f"!25s I I 3s I I 40s 25s 920s"     
 
 
 ########################################################################################
@@ -303,12 +303,12 @@ while True:
     print()
     print("Les commandes suivantes sont disponibles:")
     print()
-    print("open <addressIP>")
-    print("ls")
-    print("get")
-    print("bye")
+    print("1. open localhost")
+    print("2. ls")
+    print("3. get")
+    print("4. bye")
     print()
-    print("Veuillez entrer une commande")
+    print("Veuillez entrer le chiffre correspondant a la commande")
     print()
     commande = input("Commande: ")
 

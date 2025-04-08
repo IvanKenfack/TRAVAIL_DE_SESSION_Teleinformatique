@@ -45,7 +45,7 @@ numero_ack = 0
 #Drapeau/code de controle
 drapeau = b""
 #Taille maximal du segment/Maximum segment size
-tailleMorçeau = 745 #random.randint(274,280)
+tailleMorçeau = 730 #random.randint(274,280)
 #Taille de la fenetre du client
 fenetrage =  random.randint(65486,65536)     #tailleMorçeau * 239  #65486
 
@@ -59,7 +59,7 @@ donnee = b""
 
 #Definition du parametre format de struct.pack
 # network byte order numero_seq(4 octets), numero_ack(4 octets), drapeau(3 octets), tailleMorçeau(4 octets), checksum(40 octets), nom_fichier(15 octets), donnee({tailleMorceau} octets)
-format_entete = f"!15s I I 3s I I 40s 15s 940s"     
+format_entete = f"!25s I I 3s I I 40s 15s 930s"     
 
 
 ########################################################################################
@@ -279,7 +279,7 @@ def ReceptionDonnees(socket,nom_fichier_reçu):
             donnée = donnees.rstrip(b"\x00")
             drapeau = drapeau.decode()
 
-            #Verificatio de la fin du fichier
+            #Verification de la fin du fichier
             if drapeau == "FIN":
                 print("FIN du fichier reçu")
                 break
@@ -336,7 +336,7 @@ while True:
             données = sock_client1.recv(1029)
             print("Commande bye reçue")
             print()
-        except sock_client1.timeout:
+        except socket.timeout:
             print("Delai d'attente depassé")
             print()
             print("Reexpedition de la commande bye")
@@ -347,9 +347,9 @@ while True:
                 print()
                 sock_client1.settimeout(DELAI_MAX)
                 try:
-                    données, adresse = socket.recvfrom(1029)
+                    données, adresse = sock_client1.recvfrom(1029)
                     break
-                except sock_client1.timeout:
+                except socket.timeout:
                     if index == ESSAIES_MAX - 1:
                         print("Echec de la connexion")
                         print()
@@ -379,7 +379,7 @@ while True:
             données = sock_client1.recv(1029)
             # Extraction des informations du segment
             commande,numero_seq, numero_ack, drapeau, fenetrage1, tailleMorçeau1, checksum, nom_fichier, donnee = struct.unpack(format_entete, données)
-            commande = commande.rstrip(b"\x00")
+            drapeau = drapeau.rstrip(b"\x00")
 
             if signature_ACK == checksum.rstrip(b"\x00"):
 
@@ -393,7 +393,7 @@ while True:
                 sock_client1.close()
                 break
 
-        except sock_client1.timeout:
+        except socket.timeout:
             print("Delai d'attente depassé")
             print()
             print("Reexpedition de la commande ls")
@@ -404,9 +404,9 @@ while True:
                 print()
                 sock_client1.settimeout(DELAI_MAX)
                 try:
-                    données, adresse = socket.recvfrom(1029)
+                    données, adresse = sock_client1.recvfrom(1029)
                     break
-                except sock_client1.timeout:
+                except socket.timeout:
                     if index == ESSAIES_MAX - 1:
                         print("Echec de la connexion")
                         print()
@@ -419,7 +419,9 @@ while True:
 
         
         # Reception des données
-        données = sock_client1.recv(1029).decode('utf-8')
+        #données = sock_client1.recv(1029).decode('utf-8')
+        donnee = donnee.rstrip(b"\x00")
+        donnee = donnee.decode('utf-8')
         print()
         print("****** Liste des fichiers disponibles ******")
         print()
@@ -428,7 +430,7 @@ while True:
         print()
 
     # Si la commande est "open localhost" ou "open
-    elif commande == b"open localhost" or commande == b"open 127.0.0.1" or commande == "1":
+    elif commande == b"open localhost" or commande == b"open 127.0.0.1" or commande == b"1":
 
         # Envoi de la commande
         EnvoiMessage(sock_client1, segment, address_serveur)
@@ -461,7 +463,7 @@ while True:
             données = sock_client1.recv(1029)
             print("Commande get reçue")
             print()
-        except sock_client1.timeout:
+        except socket.timeout:
             print("Delai d'attente depassé")
             print()
             print("Reexpedition de la commande get")
@@ -489,7 +491,14 @@ while True:
 
         # Je modifie le nom du fichier à la reception pour eviter les conflits d'ecriture (le fichier source étant dans le meme repertoire)
         nom, extension = os.path.splitext(nom_fichier)
+        nom = nom.decode('utf-8')
+        extension = extension.decode('utf-8')
+        print()
+       # print(f"Nom du fichier: {nom}")
+        #print(f"Extension du fichier: {extension}")
         fichier_reçu = f"{nom}_reçu{extension}"
+        print()
+        print(f"Nom du fichier reçu: {fichier_reçu}")
         print()
         ReceptionDonnees(sock_client1,fichier_reçu)
         print()

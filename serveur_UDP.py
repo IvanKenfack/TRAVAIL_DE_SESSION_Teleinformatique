@@ -88,7 +88,7 @@ signature_SYN_ACK = GenerateurSignatureHash(b"SYN-ACK")
 
 #Definition parametre format de struct.pack
 # numero_seq(4 octets), numero_ack(4 octets), drapeau(3 octets), tailleMorçeau(4 octets), checksum(40 octets), nom_fichier(15 octets), donnee(204800 octets)
-format_entete = "!15s I I 3s I I 40s 15s 940s"     
+format_entete = "!25s I I 3s I I 40s 15s 930s"     
 
 #Definition de la fonction de creation de segment
 def CreationSegment(commande,numero_seq, numero_ack, drapeau, fenetrage_srvr, tailleMorçeau, checksum, nom_fichier, donnee):
@@ -249,11 +249,14 @@ def EnvoiFichier(socket, nom_fichier):
 
     # Envoi du fichier
     with open (nom_fichier, "rb") as fichier:    # Ouverture du fichier en mode lecture binaire
-        morçeau = fichier.read(950)                # Lecture des octets
-        while morçeau:                             # Boucle pour lire tous les octets
-                segment =  CreationSegment(b"",numero_seq, numero_ack, b"", fenetrage_srvr, tailleMorçeau, GenerateurSignatureHash(morçeau), b"", morçeau)
+        morçeau = fichier.read(930) 
+        i = 0               # Lecture des octets
+        while morçeau:
+                print (f"Iteration {i+1}, taille morceau : {len(morçeau)}")                             # Boucle pour lire tous les octets
+                segment =  CreationSegment(b"",numero_seq, numero_ack, b"", fenetrage_srvr, len(morçeau), GenerateurSignatureHash(morçeau), b"", morçeau)
                 socket.send(segment)         # Envoi des octets
-                morçeau = fichier.read(950)        # Lecture des octets pour controler la boucle
+                morçeau = fichier.read(930)        # Lecture des octets pour controler la boucle
+                i += 1
         
         # Envoi du segment de fin
         segment = CreationSegment(b"",numero_seq, numero_ack, b"FIN", fenetrage_srvr, tailleMorçeau, GenerateurSignatureHash(b"FIN"), b"", b"")
@@ -333,7 +336,7 @@ while True:
 
         numero_ack = numero_seq + 1
         #Creation et envoi du segment ACK
-        segment = CreationSegment(b"ACK",numero_seq, numero_ack, b"", fenetrage_srvr, tailleMorçeau, GenerateurSignatureHash(b"ACK"), b"", b"ACK")
+        segment = CreationSegment(b"",numero_seq, numero_ack, b"ACK", fenetrage_srvr, tailleMorçeau, GenerateurSignatureHash(b"ACK"), b"", b"ACK")
         EnvoiMessageAvecConnexion(sock_servr, segment)    # Envoi du segment ACK
         print("ACK envoyé")
         print()
@@ -350,7 +353,9 @@ while True:
         données = "\n".join(données)
 
         #Envoi de la liste des fichiers
-        sock_servr.send(données.encode('utf-8'))
+        données = données.encode('utf-8')                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           
+        segment = CreationSegment(b"",numero_seq, numero_ack, b"ACK", fenetrage_srvr, tailleMorçeau, GenerateurSignatureHash(données), b"", données)
+        EnvoiMessageAvecConnexion(sock_servr, segment)    # Envoi de la liste des fichiers
         print()
         print("Liste des fichiers envoyée")
         print()
@@ -361,7 +366,7 @@ while True:
         print()
         numero_ack = numero_seq + 1
         #Creation et envoi du segment ACK
-        segment = CreationSegment(b"ACK",numero_seq, numero_ack, b"", fenetrage_srvr, tailleMorçeau, GenerateurSignatureHash(b"ACK"), b"", b"ACK")
+        segment = CreationSegment(b"",numero_seq, numero_ack, b"ACK", fenetrage_srvr, tailleMorçeau, GenerateurSignatureHash(b"ACK"), b"", b"ACK")
         EnvoiMessageAvecConnexion(sock_servr, segment)    # Envoi du segment ACK
         print("ACK envoyé")
         print()

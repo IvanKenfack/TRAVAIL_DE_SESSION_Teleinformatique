@@ -584,7 +584,7 @@ def ProcessusInitiationConnexion(socket):
             print()
 
             for index in range(ESSAIES_MAX):
-                EnvoiMessage(socket, segment, address_serveur)
+                EnvoiMessage(socket, segment, address_client)
                 print("SYN réenvoyé")
                 print()
                 socket.settimeout(DELAI_MAX)

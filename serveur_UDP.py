@@ -246,18 +246,21 @@ def EnvoiFichier(socket, nom_fichier):
     print()
     print("***************** Envoi du fichier **********************")
     print()
-
-    # Envoi du fichier
+      # Boucle pour ajouter des octets nuls à la fin du nom de fichier
+    
     with open (nom_fichier, "rb") as fichier:    # Ouverture du fichier en mode lecture binaire
-        morçeau = fichier.read(930) 
-        i = 0               # Lecture des octets
-        while morçeau:
+        #morçeau
+        i = 1        
+        
+        
+        for i in fichier():      # Lecture des octets
+        # while morçeau:
                 #print (f"Iteration {i+1}, taille morceau : {len(morçeau)}") 
                                             # Boucle pour lire tous les octets
                 segment =  CreationSegment(b"",numero_seq, numero_ack, b"", fenetrage_srvr, len(morçeau), GenerateurSignatureHash(morçeau), b"", morçeau)
                 socket.send(segment)         # Envoi des octets
-                morçeau = fichier.read(930)        # Lecture des octets pour controler la boucle
-                i += 1
+                # morçeau = fichier.read(930)        # Lecture des octets pour controler la boucle
+                
         
         # Envoi du segment de fin
         segment = CreationSegment(b"",numero_seq, numero_ack, b"FIN", fenetrage_srvr, tailleMorçeau, GenerateurSignatureHash(b"FIN"), b"", b"")

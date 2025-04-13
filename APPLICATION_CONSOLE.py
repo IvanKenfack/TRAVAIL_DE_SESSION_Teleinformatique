@@ -753,7 +753,7 @@ def ProcessusPoigneDeMain(socket):
 
         print()
 
-    # Sinon il y'a affichage d'un message d'erreur
+    # Sinon, il y a affichage d'un message d'erreur
     else:
         print("SYN-ACK reçu corrompu")
         print()
@@ -788,7 +788,7 @@ def ReceptionDonnees(socket, nom_fichier_reçu):
             données = socket.recv(1029)
             commande, numero_seq, numero_ack, drapeau, fenetrage1, mss1, checksum, nom_fichier, donnees = struct.unpack(
                 format_entete, données)
-            donnée = donnees.rstrip(b"\x00")
+            donnée = donnees[:mss1]
             drapeau = drapeau.decode()
 
             # Verification de la fin du fichier

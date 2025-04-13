@@ -496,7 +496,7 @@ signature_SYN_ACK = GenerateurSignatureHash(b"SYN-ACK")
 
 # Definition parametre format de struct.pack
 # numero_seq(4 octets), numero_ack(4 octets), drapeau(3 octets), tailleMorçeau(4 octets), checksum(40 octets), nom_fichier(15 octets), donnee(204800 octets)
-format_entete = "!25s I I 3s I I 40s 25s 920s"
+format_entete = f"!25s I I 3s I I 40s 25s 920s"
 
 
 # Definition de la fonction de creation de segment
@@ -604,7 +604,7 @@ def ProcessusInitiationConnexion(socket):
                     print("Tentative de reexpedition du segment SYN-ACK numero {}".format(index + 1))
                     continue
 
-    # Sinon il y'a affichage d'un message d'erreur
+    # Sinon, il y a affichage d'un message d'erreur
     else:
         print("SYN reçu corrompu")
 
@@ -654,6 +654,8 @@ def ProcessusInitiationConnexion(socket):
 # Fonction pour l'envoi de fichier
 def EnvoiFichier(socket, nom_fichier):
     global fenetrage_clt, tailleMorçeau
+
+    taille_fichier = os.path.getsize(nom_fichier)
     print()
     print("***************** Envoi du fichier **********************")
     print()
@@ -661,15 +663,16 @@ def EnvoiFichier(socket, nom_fichier):
     # Envoi du fichier
     with open(nom_fichier, "rb") as fichier:  # Ouverture du fichier en mode lecture binaire
         morçeau = fichier.read(930)
-        i = 0  # Lecture des octets
-        while morçeau:
-            # print (f"Iteration {i+1}, taille morceau : {len(morçeau)}")
-            # Boucle pour lire tous les octets
-            segment = CreationSegment(b"", numero_seq, numero_ack, b"", fenetrage_srvr, len(morçeau),
-                                      GenerateurSignatureHash(morçeau), b"", morçeau)
-            socket.send(segment)  # Envoi des octets
-            morçeau = fichier.read(930)  # Lecture des octets pour controler la boucle
-            i += 1
+        #Initialisation bar de progression TQDM
+        with tqdm(total = taille_fichier, unit ='B',unit_scale=True,desc="Envoi", ncols=80) as pbar:
+            while morçeau:
+                # print (f"Iteration {i+1}, taille morceau : {len(morçeau)}")
+                # Boucle pour lire tous les octets
+                segment = CreationSegment(b"", numero_seq, numero_ack, b"", fenetrage_srvr, len(morçeau),
+                                          GenerateurSignatureHash(morçeau), b"", morçeau)
+                socket.send(segment)  # Envoi des octets
+                pbar.update(len(morçeau))
+                morçeau = fichier.read(930)  # Lecture des octets pour controler la boucle
 
         # Envoi du segment de fin
         segment = CreationSegment(b"", numero_seq, numero_ack, b"FIN", fenetrage_srvr, tailleMorçeau,

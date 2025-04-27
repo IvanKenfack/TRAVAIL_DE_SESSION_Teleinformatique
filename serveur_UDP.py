@@ -43,6 +43,7 @@ numero_ack = 0
 # Drapeau/code de controle
 drapeau = b""
 
+TAILLE_MORCEAU = 930
 # tailleMorçeau generé aléatoirement pour simuler également la mutabilité de ce dernier dependament de la connexion
 tailleMorçeau = 200  # random.randint(274,280)     #204874
 
@@ -240,7 +241,8 @@ def ProcessusInitiationConnexion(socket):
 # Fonction pour l'envoi de fichier
 def EnvoiFichier(socket, nom_fichier):
     global fenetrage_clt, tailleMorçeau
-
+    #socket.connect(receiver_address)  # Connexion au serveur
+    print()
     taille_fichier = os.path.getsize(nom_fichier)
     print()
     print("***************** Envoi du fichier **********************")
@@ -248,7 +250,7 @@ def EnvoiFichier(socket, nom_fichier):
 
     # Envoi du fichier
     with open(nom_fichier, "rb") as fichier:  # Ouverture du fichier en mode lecture binaire
-        morçeau = fichier.read(930)
+        morçeau = fichier.read(TAILLE_MORCEAU)
         #Initialisation bar de progression TQDM
         with tqdm(total = taille_fichier, unit ='B',unit_scale=True,desc="Envoi", ncols=80) as pbar:
             while morçeau:
@@ -257,16 +259,22 @@ def EnvoiFichier(socket, nom_fichier):
                 segment = CreationSegment(b"", numero_seq, numero_ack, b"", fenetrage_srvr, len(morçeau),
                                           GenerateurSignatureHash(morçeau), b"", morçeau)
                 socket.send(segment)  # Envoi des octets
+
+                
+
+
                 pbar.update(len(morçeau))
-                morçeau = fichier.read(930)  # Lecture des octets pour controler la boucle
+                morçeau = fichier.read(TAILLE_MORCEAU)  # Lecture des octets pour controler la boucle
 
         # Envoi du segment de fin
-        segment = CreationSegment(b"", numero_seq, numero_ack, b"FIN", fenetrage_srvr, tailleMorçeau,
+        segment = CreationSegment(b"", numero_seq, numero_ack, b"FIN", fenetrage_srvr,len(morçeau),
                                   GenerateurSignatureHash(b"FIN"), b"", b"")
         socket.send(segment)  # Envoi du segment de fin
         print("Fichier envoyé")
     print()
+    print("***************** Fin de l'envoi **********************")
 
+    return
 
 ############################################################################################################
 

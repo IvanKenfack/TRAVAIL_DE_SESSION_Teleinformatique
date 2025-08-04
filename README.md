@@ -1,7 +1,7 @@
 Implémentation d'un service de transfert de fichiers fiable en utilisant les sockets UDP en python 3.13
 # INF26207 – Transfert de fichier via Sockets UDP
 
-Travail de session du cours **INF26207 – Téléinformatique**, Hiver 2025, UQAR 
+Travail de session du cours **INF26207 – Téléinformatique**, Hiver 2025, UQAR.
 Ce projet consiste à concevoir un protocole simple de transfert de fichiers fiable, basé sur **UDP (avec `socket.socket`)**, en simulant un environnement réseau peu fiable.
 
 ## Objectifs
